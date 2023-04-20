@@ -192,7 +192,7 @@ impl SDFElement
                 let typename = prefix + child.properties.name.as_str();
                 out +=
                     format!(
-                        "  #[yaserde(child, rename = \"{}\")]\n  pub _{}: {},\n",
+                        "  #[yaserde(child, rename = \"{}\")]\n  pub {}: {},\n",
                         child.properties.name,
                         child.properties.name,
                         child.properties.required.wrap_type(typename.as_str())
@@ -211,15 +211,11 @@ impl SDFElement
                     ).as_str();
             }
         }
+        if self.properties.rtype.len() > 0 {
+            out += format!("#[yaserde(text)]\n   data: String\n").as_str();//format!("data: {}", self.properties.rtype).as_str(); 
+        }
         out += "}\n\n";
         out += child_gen.as_str();
-
-        out += format!("impl {}{} {{\n", prefix, self.properties.name).as_str();
-        for child in &self.child_attrs {
-           // TODO(arjo): work out getter
-           out += child.getter().as_str();
-        }
-        out += "}\n";
         out
     }
 }
@@ -302,7 +298,7 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
 
 fn main() {
 
-    let spec = read_spec("sdformat_spec/1.10/camera.sdf").unwrap();
+    let spec = read_spec("sdformat_spec/1.10/box.sdf").unwrap();
 
     let mut model = SDFElement::new();
     parse_element(&mut model, &spec);
