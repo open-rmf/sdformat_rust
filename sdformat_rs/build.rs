@@ -7,8 +7,6 @@ use std::error::Error;
 
 use xmltree::{Element, XMLNode};
 
-use tera::Tera;
-
 fn read_spec(filename: &str) -> Result<Element, Box<dyn Error>>
 {
     let addr = Element::parse(
@@ -22,6 +20,11 @@ fn get_storage_type<'a>(type_str: &str) -> &'a str
 {
     if type_str == "double" {
         return "f64";
+    }
+
+    // TODO(arjo): SDF bool is a bit funny and probably needs type support
+    if type_str == "bool" {
+        return "bool";
     }
     return "String";
 }
@@ -114,7 +117,7 @@ impl SDFAttribute
     }
     fn get_field_string(&self) -> String {
 
-        format!("  #[yaserde(attribute, rename = \"{}\")]\n  {}: {},\n",
+        format!("  #[yaserde(attribute, rename = \"{}\")]\n  _{}: {},\n",
             self.name,
             self.name,
             self.required.wrap_type(get_storage_type(self.rtype.as_str())))
@@ -124,7 +127,7 @@ impl SDFAttribute
     fn getter_body(&self) -> String
     {
         if return_type(self.rtype.as_str()) == self.rtype {
-            format!("  self.{}", self.name)
+            format!("  self._{}", self.name)
         }
         else {
             format!("")
@@ -133,10 +136,6 @@ impl SDFAttribute
 
 
     fn getter(&self) -> String {
-
-        if return_type(self.rtype.as_str()) == self.rtype {
-
-        }
         format!(r#"pub fn get_{}(&self) -> {} {{
             {}
         }}"#, self.name, return_type(self.rtype.as_str()), self.getter_body())
@@ -216,13 +215,9 @@ impl SDFElement
         out += child_gen.as_str();
 
         out += format!("impl {}{} {{\n", prefix, self.properties.name).as_str();
-        for child in &self.child_elems {
-            if child.properties.rtype == "" {
-                
-            }
-            else {
-
-            }
+        for child in &self.child_attrs {
+           // TODO(arjo): work out getter
+           // out += child.getter().as_str();
         }
         out += "}\n";
         out
@@ -312,14 +307,6 @@ fn main() {
     let mut model = SDFElement::new();
     parse_element(&mut model, &spec);
     let contents = model.code_gen("");
-
-    let tera = match Tera::new("templates/**.tera") {
-        Ok(t) => t,
-        Err(e) => {
-            println!("Parsing error(s): {}", e);
-            ::std::process::exit(1);
-        }
-    };
 
     // For debug
     fs::write("test_codegen.rs", contents.clone());
