@@ -1,3 +1,5 @@
+use yaserde::de::from_str;
+
 /*use sdformat_rs::camera;
 
 #[test]
@@ -21,7 +23,6 @@ fn test_camera_fragment()
 }*/
 
 /*use sdformat_rs::pose;
-use yaserde::de::from_str;
 #[test]
 fn test_pose_fragment()
 {
@@ -33,3 +34,16 @@ fn test_pose_fragment()
         assert_eq!(pose.get_pose(), "0 0 0".to_string());
     }
 }*/
+use sdformat_rs::SdfBox;
+use nalgebra::Vector3;
+#[test]
+fn test_camera_fragment()
+{
+    let test_syntax = "<box><size>0 0 1</size></box>";
+    let fr = from_str::<SdfBox>(test_syntax);
+    assert!(matches!(fr, Ok(_)));
+
+    if let Ok(box_shape) = fr {
+        assert!((box_shape.size.data - Vector3::<f64>::new(0.0,0.0,1.0)).norm().abs() < 0.000001);
+    }
+}

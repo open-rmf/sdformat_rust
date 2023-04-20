@@ -4,7 +4,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::Path;
 use std::error::Error;
-
+use convert_case::{Case, Casing};
 use xmltree::{Element, XMLNode};
 
 fn read_spec(filename: &str) -> Result<Element, Box<dyn Error>>
@@ -25,6 +25,10 @@ fn get_storage_type<'a>(type_str: &str) -> &'a str
     // TODO(arjo): SDF bool is a bit funny and probably needs type support
     if type_str == "bool" {
         return "bool";
+    }
+
+    if type_str == "vector3" {
+        return "Vector3d";
     }
     return "String";
 }
@@ -177,7 +181,7 @@ impl SDFElement
         let mut out = "".to_string();
         out += "#[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]\n";
         out += format!("#[yaserde(rename = \"{}\")]\n", self.properties.name).as_str();
-        out += format!("pub struct {}{} {{\n", prefix, self.properties.name).as_str();
+        out += format!("pub struct Sdf{}{} {{\n", prefix, self.properties.name.to_case(Case::Pascal)).as_str();
         for child in &self.child_attrs {
             out += child.get_field_string().as_str();
         }
@@ -192,10 +196,10 @@ impl SDFElement
                 let typename = prefix + child.properties.name.as_str();
                 out +=
                     format!(
-                        "  #[yaserde(child, rename = \"{}\")]\n  pub {}: {},\n",
+                        "  #[yaserde(child, rename = \"{}\")]\n  pub {}: Sdf{},\n",
                         child.properties.name,
                         child.properties.name,
-                        child.properties.required.wrap_type(typename.as_str())
+                        child.properties.required.wrap_type(typename.to_case(Case::Pascal).as_str())
                     ).as_str();
 
             }
@@ -204,7 +208,7 @@ impl SDFElement
                 let typename = get_storage_type(child.properties.rtype.as_str());
                 out +=
                     format!(
-                        "  #[yaserde(child, rename = \"{}\")]\n  _{}: {},\n",
+                        "  #[yaserde(child, rename = \"{}\")]\n  pub {}: {},\n",
                         child.properties.name,
                         child.properties.name,
                         child.properties.required.wrap_type(typename)
@@ -298,7 +302,7 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
 
 fn main() {
 
-    let spec = read_spec("sdformat_spec/1.10/box.sdf").unwrap();
+    let spec = read_spec("sdformat_spec/1.10/box_shape.sdf").unwrap();
 
     let mut model = SDFElement::new();
     parse_element(&mut model, &spec);
