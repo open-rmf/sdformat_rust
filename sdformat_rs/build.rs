@@ -126,8 +126,8 @@ impl SDFAttribute
 
     fn getter_body(&self) -> String
     {
-        if return_type(self.rtype.as_str()) == self.rtype {
-            format!("  self._{}", self.name)
+        if return_type(self.rtype.as_str()) == get_storage_type(self.rtype.as_str()) {
+            format!("  self._{}.clone()", self.name)
         }
         else {
             format!("")
@@ -138,7 +138,7 @@ impl SDFAttribute
     fn getter(&self) -> String {
         format!(r#"pub fn get_{}(&self) -> {} {{
             {}
-        }}"#, self.name, return_type(self.rtype.as_str()), self.getter_body())
+        }}"#, self.name, self.required.wrap_type(return_type(self.rtype.as_str()).as_str()), self.getter_body())
     }
 }
 
@@ -192,7 +192,7 @@ impl SDFElement
                 let typename = prefix + child.properties.name.as_str();
                 out +=
                     format!(
-                        "  #[yaserde(child, rename = \"{}\")]\n  _{}: {},\n",
+                        "  #[yaserde(child, rename = \"{}\")]\n  pub _{}: {},\n",
                         child.properties.name,
                         child.properties.name,
                         child.properties.required.wrap_type(typename.as_str())
@@ -217,7 +217,7 @@ impl SDFElement
         out += format!("impl {}{} {{\n", prefix, self.properties.name).as_str();
         for child in &self.child_attrs {
            // TODO(arjo): work out getter
-           // out += child.getter().as_str();
+           out += child.getter().as_str();
         }
         out += "}\n";
         out
