@@ -153,6 +153,13 @@ impl TypeSerializationTrait for QuaternionSerialization {
         "quaternion"
     }
 
+    fn parse_args(&self, special_values: &HashMap<String, Value>) {
+        if let Some(key) = special_values.get("degrees")
+        {
+           
+        }
+    }
+
     fn parse(&self, istr:  &str) -> Option<Self::Item> {
         let sz: Vec<&str> = istr.split_whitespace().collect();
         if sz.len() == 3 {
@@ -192,8 +199,6 @@ impl TypeSerializationTrait for QuaternionSerialization {
                     }
                 }
             }
-
-
         }
 
         None
@@ -221,7 +226,7 @@ impl TypeSerializationTrait for PoseSerialization {
     }
 
     fn typename<'a>(&self) -> &'a str {
-        "quaternion"
+        "pose"
     }
 
     fn parse(&self, istr:  &str) -> Option<Self::Item> {

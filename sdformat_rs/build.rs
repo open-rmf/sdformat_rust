@@ -7,6 +7,8 @@ use std::error::Error;
 
 use xmltree::{Element, XMLNode};
 
+use tera::Tera;
+
 fn read_spec(filename: &str) -> Result<Element, Box<dyn Error>>
 {
     let addr = Element::parse(
@@ -80,20 +82,11 @@ fn return_type(typename: &str) -> String
     }
     else if typename == "pose"
     {
-        return "pose".to_string();
+        return "Pose".to_string();
     }
     return typename.to_string();
 }
 
-
-/*fn body_for_rtype(name: &str, rtype: &str) -> String
-{
-    if rtype == "vector3" {
-        format!("")
-    }
-
-    else if rtype == ""
-}*/
 
 struct SDFIncludes
 {
@@ -121,18 +114,32 @@ impl SDFAttribute
     }
     fn get_field_string(&self) -> String {
 
-        format!("  #[yaserde(attribute, rename = \"{}\")]\n  _{}: {},\n",
+        format!("  #[yaserde(attribute, rename = \"{}\")]\n  {}: {},\n",
             self.name,
             self.name,
             self.required.wrap_type(get_storage_type(self.rtype.as_str())))
 
     }
 
+    fn getter_body(&self) -> String
+    {
+        if return_type(self.rtype.as_str()) == self.rtype {
+            format!("  self.{}", self.name)
+        }
+        else {
+            format!("")
+        }
+    }
+
+
     fn getter(&self) -> String {
-        /*format!(r#"fn get_{}(&self) -> {} {{
+
+        if return_type(self.rtype.as_str()) == self.rtype {
+
+        }
+        format!(r#"pub fn get_{}(&self) -> {} {{
             {}
-        }}"#, self.name, return_type(self.rtype.as_str()), body_for_rtype(self.rtype.as_str()))*/
-        "".to_string()
+        }}"#, self.name, return_type(self.rtype.as_str()), self.getter_body())
     }
 }
 
@@ -207,6 +214,17 @@ impl SDFElement
         }
         out += "}\n\n";
         out += child_gen.as_str();
+
+        out += format!("impl {}{} {{\n", prefix, self.properties.name).as_str();
+        for child in &self.child_elems {
+            if child.properties.rtype == "" {
+                
+            }
+            else {
+
+            }
+        }
+        out += "}\n";
         out
     }
 }
@@ -294,6 +312,14 @@ fn main() {
     let mut model = SDFElement::new();
     parse_element(&mut model, &spec);
     let contents = model.code_gen("");
+
+    let tera = match Tera::new("templates/**.tera") {
+        Ok(t) => t,
+        Err(e) => {
+            println!("Parsing error(s): {}", e);
+            ::std::process::exit(1);
+        }
+    };
 
     // For debug
     fs::write("test_codegen.rs", contents.clone());
