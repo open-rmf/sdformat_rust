@@ -68,7 +68,7 @@ impl RequiredStatus {
 }
 
 fn sanitize_field(fieldname: &str) -> String {
-    let hashset = HashSet::from(["loop", "static", "type"]);
+    let hashset = HashSet::from(["loop", "static", "type", "box"]);
 
     if hashset.contains(fieldname) {
         format!("r#{}", fieldname)
@@ -153,6 +153,14 @@ impl SDFElement
         }
     }
 
+    fn typename(&self) -> String {
+        if self.top_level {
+            self.source_file[..self.source_file.len()-4].to_string().to_case(Case::Pascal)
+        }
+        else {
+            self.properties.name.to_case(Case::Pascal)
+        }
+    }
 
 
     fn code_gen(&self, prefix: &str, file_map: &HashMap<String, SDFElement>) -> String
@@ -163,7 +171,7 @@ impl SDFElement
         out += "#[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]\n";
         out += format!("#[yaserde(rename = \"{}\")]\n", self.properties.name).as_str();
         if self.top_level {
-            out += format!("pub struct {}{} {{\n", prefix_type(prefix), self.source_file[..self.source_file.len()-4].to_string().to_case(Case::Pascal)).as_str();
+            out += format!("pub struct {}{} {{\n", prefix_type(prefix), self.typename()).as_str();
         }
         else {
             out += format!("pub struct {}{} {{\n", prefix_type(prefix), self.properties.name.to_case(Case::Pascal)).as_str();
@@ -203,9 +211,13 @@ impl SDFElement
         }
         for child in &self.child_includes {
             if let Some(element) = file_map.get(&child.filename.to_string()) {
-                let type_signature = child.required.wrap_type(
-                    format!("Sdf{}", element.properties.name.to_case(Case::Pascal)).as_str());
-                out += format!("  pub {} : {}\n,", &sanitize_field(&element.properties.name.to_case(Case::Snake)), type_signature).as_str();
+                
+                let typename = child.required.wrap_type(
+                    &("Sdf".to_string() + element.typename().as_str()));
+                out += format!("  #[yaserde(child, rename = \"{}\")]\n  pub {} : {},\n",
+                    element.properties.name.to_case(Case::Snake),
+                    &sanitize_field(&element.properties.name.to_case(Case::Snake)), 
+                    typename).as_str();
             }
             else {
                 panic!("Unable to find element for file: {}", child.filename);
@@ -293,9 +305,15 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
                 }
                 else if el.name == "element"
                 {
-                    let mut elem = SDFElement::new();
-                    parse_element(&mut elem, &el);
-                    model.child_elems.push(elem);
+                    if el.attributes.contains_key("ref")
+                    {
+
+                    }
+                    else {
+                        let mut elem = SDFElement::new();
+                        parse_element(&mut elem, &el);
+                        model.child_elems.push(elem);
+                    }
                 }
                 else if el.name == "include"
                 {
@@ -305,6 +323,14 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
                     };
                     model.child_includes.push(incl);
                 }
+                else if el.name == "description"
+                {
+                    if let Some(desc) = el.get_text()
+                    {
+                        model.properties.description = desc.to_string();
+                    }
+                }
+
             }
             _ => {
 
@@ -343,7 +369,7 @@ fn main() {
 
     let mut contents = "".to_string();
     for (file, model) in &hashmap {
-        if file == "plugin.sdf"  || file == "model.sdf" {
+        if file == "plugin.sdf" || file == "frame.sdf" {
             //Skip
             continue
         }

@@ -34,13 +34,13 @@ fn test_pose_fragment()
         assert_eq!(pose.get_pose(), "0 0 0".to_string());
     }
 }*/
-use sdformat_rs::SdfBox;
+use sdformat_rs::SdfBoxShape;
 use nalgebra::Vector3;
 #[test]
 fn test_camera_fragment()
 {
     let test_syntax = "<box><size>0 0 1</size></box>";
-    let fr = from_str::<SdfBox>(test_syntax);
+    let fr = from_str::<SdfBoxShape>(test_syntax);
     assert!(matches!(fr, Ok(_)));
 
     if let Ok(box_shape) = fr {

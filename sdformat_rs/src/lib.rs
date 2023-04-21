@@ -8,15 +8,22 @@ use yaserde::xml::attribute::OwnedAttribute;
 use yaserde::xml::namespace::Namespace;
 use nalgebra::*;
 
-/// Most of the structs are generated automatically from the 
+// Most of the structs are generated automatically from the 
 include!(concat!(env!("OUT_DIR"), "/sdf.rs"));
 
 
-/// Manually declar plugin
+// Manually declare plugin
 #[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]
 #[yaserde(rename = "plugin")]
-struct SdfPlugin {
-    
+pub struct SdfPlugin {
+
+}
+
+// Frame is another wierdo
+#[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]
+#[yaserde(rename = "frame")]
+pub struct SdfFrame {
+
 }
 /*impl pose {
     pub fn get_pose(&self) -> String
