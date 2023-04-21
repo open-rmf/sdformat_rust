@@ -223,17 +223,9 @@ dependencies = [
  "convert_case",
  "minidom",
  "nalgebra",
- "sdformat_type_support",
  "xmltree",
  "yaserde",
  "yaserde_derive",
-]
-
-[[package]]
-name = "sdformat_type_support"
-version = "0.1.0"
-dependencies = [
- "nalgebra",
 ]
 
 [[package]]

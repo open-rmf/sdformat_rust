@@ -9,7 +9,6 @@ edition = "2021"
 yaserde={version = "0.7.0"}
 yaserde_derive="0.7.0"
 nalgebra = "0.31.4"
-sdformat_type_support = {path="../sdformat_type_support"}
 
 [build-dependencies]
 minidom="0.15.0"

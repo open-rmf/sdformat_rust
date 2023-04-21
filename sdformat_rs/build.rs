@@ -1,10 +1,12 @@
-use std::env;
+use std::collections::{hash_map, HashSet};
+use std::{env, collections::HashMap};
 use std::fmt::format;
 use std::fs;
 use std::io::Cursor;
 use std::path::Path;
 use std::error::Error;
 use convert_case::{Case, Casing};
+use minidom::element;
 use xmltree::{Element, XMLNode};
 
 fn read_spec(filename: &str) -> Result<Element, Box<dyn Error>>
@@ -65,40 +67,21 @@ impl RequiredStatus {
     }
 }
 
-fn return_type(typename: &str) -> String
-{
-    if typename == "string"
-    {
-        return "String".to_string();
-    }
-    else if typename == "double"
-    {
-        return "f64".to_string();
-    }
-    else if typename == "vector3"
-    {
-        return "Vector3<f64>".to_string();
-    }
-    else if typename == "vector2d"
-    {
-        return "Vector2<f64>".to_string();
-    }
-    else if typename == "vector2i"
-    {
-        return "Vector2<i64>".to_string();
-    }
-    else if typename == "pose"
-    {
-        return "Pose".to_string();
-    }
-    return typename.to_string();
-}
+fn sanitize_field(fieldname: &str) -> String {
+    let hashset = HashSet::from(["loop", "static", "type"]);
 
+    if hashset.contains(fieldname) {
+        format!("r#{}", fieldname)
+    }
+    else {
+        fieldname.to_string()
+    }
+}
 
 struct SDFIncludes
 {
     filename: String,
-    required: String
+    required: RequiredStatus
 }
 
 struct SDFAttribute
@@ -106,7 +89,8 @@ struct SDFAttribute
     name: String,
     rtype: String,
     required: RequiredStatus,
-    default: Option<String>
+    default: Option<String>,
+    description: String
 }
 
 impl SDFAttribute
@@ -116,33 +100,26 @@ impl SDFAttribute
             name: "".to_string(),
             rtype: "".to_string(),
             required: RequiredStatus::Optional,
-            default: None
+            default: None,
+            description: "".to_string()
         }
     }
     fn get_field_string(&self) -> String {
-
-        format!("  #[yaserde(attribute, rename = \"{}\")]\n  _{}: {},\n",
+        format!("  #[yaserde(attribute, rename = \"{}\")]\n  pub {}: {},\n",
             self.name,
-            self.name,
+            sanitize_field(&self.name),
             self.required.wrap_type(get_storage_type(self.rtype.as_str())))
-
     }
+}
 
-    fn getter_body(&self) -> String
+fn prefix_type(name: &str) -> String
+{
+    if name.starts_with("Sdf") {
+        name.to_case(Case::Pascal)
+    }
+    else
     {
-        if return_type(self.rtype.as_str()) == get_storage_type(self.rtype.as_str()) {
-            format!("  self._{}.clone()", self.name)
-        }
-        else {
-            format!("")
-        }
-    }
-
-
-    fn getter(&self) -> String {
-        format!(r#"pub fn get_{}(&self) -> {} {{
-            {}
-        }}"#, self.name, self.required.wrap_type(return_type(self.rtype.as_str()).as_str()), self.getter_body())
+        "Sdf".to_string() + name.to_case(Case::Pascal).as_str()
     }
 }
 
@@ -152,7 +129,8 @@ struct SDFElement
     child_elems: Vec<SDFElement>,
     child_attrs: Vec<SDFAttribute>,
     child_includes: Vec<SDFIncludes>,
-    source_file: String
+    source_file: String,
+    top_level: bool
 }
 
 impl SDFElement
@@ -164,41 +142,49 @@ impl SDFElement
                 name: "".to_string(),
                 rtype: "".to_string(),
                 required: RequiredStatus::Optional,
-                default: None
+                default: None,
+                description: "".to_string(),
             },
             child_elems: vec!(),
             child_attrs: vec!(),
             child_includes: vec!(),
-            source_file: "".to_string()
+            source_file: "".to_string(),
+            top_level: false
         }
     }
 
 
 
-    fn code_gen(&self, prefix: &str) -> String
+    fn code_gen(&self, prefix: &str, file_map: &HashMap<String, SDFElement>) -> String
     {
 
         let mut out = "".to_string();
+        out += format!("/// Generated from {}\n", self.source_file).as_str();
         out += "#[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]\n";
         out += format!("#[yaserde(rename = \"{}\")]\n", self.properties.name).as_str();
-        out += format!("pub struct Sdf{}{} {{\n", prefix, self.properties.name.to_case(Case::Pascal)).as_str();
+        if self.top_level {
+            out += format!("pub struct {}{} {{\n", prefix_type(prefix), self.source_file[..self.source_file.len()-4].to_string().to_case(Case::Pascal)).as_str();
+        }
+        else {
+            out += format!("pub struct {}{} {{\n", prefix_type(prefix), self.properties.name.to_case(Case::Pascal)).as_str();
+        }
         for child in &self.child_attrs {
             out += child.get_field_string().as_str();
         }
 
         let mut child_gen = "".to_string();
-        let name = self.properties.name.as_str();
+        let name = prefix.to_string().to_case(Case::Pascal) + self.properties.name.as_str();
         for child in &self.child_elems {
             if child.properties.rtype == "" {
                 // TODO(arjo): Handle includes
-                let prefix = name.to_owned() +"_";
-                child_gen += child.code_gen(prefix.as_str()).as_str();
-                let typename = prefix + child.properties.name.as_str();
+                let prefix = prefix_type(&name);
+                child_gen += child.code_gen(prefix.as_str(), file_map).as_str();
+                let typename = prefix + child.properties.name.to_case(Case::Pascal).as_str();
                 out +=
                     format!(
-                        "  #[yaserde(child, rename = \"{}\")]\n  pub {}: Sdf{},\n",
+                        "  #[yaserde(child, rename = \"{}\")]\n  pub {}: {},\n",
                         child.properties.name,
-                        child.properties.name,
+                        &sanitize_field(&child.properties.name),
                         child.properties.required.wrap_type(typename.to_case(Case::Pascal).as_str())
                     ).as_str();
 
@@ -210,9 +196,19 @@ impl SDFElement
                     format!(
                         "  #[yaserde(child, rename = \"{}\")]\n  pub {}: {},\n",
                         child.properties.name,
-                        child.properties.name,
+                        &sanitize_field(&child.properties.name),
                         child.properties.required.wrap_type(typename)
                     ).as_str();
+            }
+        }
+        for child in &self.child_includes {
+            if let Some(element) = file_map.get(&child.filename.to_string()) {
+                let type_signature = child.required.wrap_type(
+                    format!("Sdf{}", element.properties.name.to_case(Case::Pascal)).as_str());
+                out += format!("  pub {} : {}\n,", &sanitize_field(&element.properties.name.to_case(Case::Snake)), type_signature).as_str();
+            }
+            else {
+                panic!("Unable to find element for file: {}", child.filename);
             }
         }
         if self.properties.rtype.len() > 0 {
@@ -222,13 +218,19 @@ impl SDFElement
         out += child_gen.as_str();
         out
     }
+
+    fn set_source(&mut self, filename: &str){
+        for elem in &mut self.child_elems {
+            elem.set_source(filename);
+        }
+        self.source_file = filename.to_string();
+    }
 }
 
 fn parse_element(model: &mut SDFElement, element: &Element) {
 
     if element.name == "element"
     {
-        //let mut child_elem = SDFElement::new();
         // Parse element description
         if let Some(name)= element.attributes.get("name")
         {
@@ -273,9 +275,13 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
     {
         let incl = SDFIncludes {
             filename: element.attributes.get("filename").unwrap().to_string(),
-            required: element.attributes.get("required").unwrap().to_string()
+            required: RequiredStatus::from_str(element.attributes.get("required").unwrap())
         };
         model.child_includes.push(incl);
+    }
+    else if element.name == "description"
+    {
+        model.properties.description = element.get_text().unwrap().to_string();
     }
 
     for child in &element.children {
@@ -291,6 +297,14 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
                     parse_element(&mut elem, &el);
                     model.child_elems.push(elem);
                 }
+                else if el.name == "include"
+                {
+                    let incl = SDFIncludes {
+                        filename: el.attributes.get("filename").unwrap().to_string(),
+                        required: RequiredStatus::from_str(element.attributes.get("required").unwrap())
+                    };
+                    model.child_includes.push(incl);
+                }
             }
             _ => {
 
@@ -299,14 +313,42 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
     }
 }
 
+fn read_all_specs() -> Result<HashMap<String, SDFElement>, String> {
+    let mut res = HashMap::new();
+    for file in std::fs::read_dir("sdformat_spec/1.10").unwrap() {
+        if let Ok(dir_entry) = file {
+            if !dir_entry.metadata().unwrap().is_file() {
+                continue;
+            }
+            if let Some(sdf) = dir_entry.path().extension() {
+                if sdf == "sdf" {
+                    let spec = read_spec(dir_entry.path().to_str().unwrap()).unwrap();
+                    let mut model = SDFElement::new();
+                    parse_element(&mut model, &spec);
+                    model.top_level = true;
+                    model.set_source(dir_entry.file_name().to_str().unwrap());
+                    res.insert(dir_entry.file_name().to_str().unwrap().to_string(), model);
+                }
+            }
+        }
+    }
+    
+
+    Ok(res)
+}
 
 fn main() {
 
-    let spec = read_spec("sdformat_spec/1.10/box_shape.sdf").unwrap();
+    let hashmap = read_all_specs().unwrap();
 
-    let mut model = SDFElement::new();
-    parse_element(&mut model, &spec);
-    let contents = model.code_gen("");
+    let mut contents = "".to_string();
+    for (file, model) in &hashmap {
+        if file == "plugin.sdf"  || file == "model.sdf" {
+            //Skip
+            continue
+        }
+        contents += &model.code_gen("", &hashmap);
+    }
 
     // For debug
     fs::write("test_codegen.rs", contents.clone());
