@@ -167,7 +167,16 @@ impl SDFElement
     {
 
         let mut out = "".to_string();
-        out += format!("/// Generated from {}\n", self.source_file).as_str();
+        out += format!("// Generated from {}\n", self.source_file).as_str();
+        if (self.properties.description != "")
+        {
+            for line in self.properties.description.split("\n")
+            {
+                out += &("/// ".to_string() + line);
+                out += "\n";
+            }
+            
+        }
         out += "#[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]\n";
         out += format!("#[yaserde(rename = \"{}\")]\n", self.properties.name).as_str();
         if self.top_level {
