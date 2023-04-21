@@ -1,30 +1,25 @@
 extern crate yaserde_derive;
 use std::io::{Read, Write};
 
-use yaserde_derive::{YaSerialize, YaDeserialize};
-use yaserde::{YaDeserialize, YaSerialize, ser, de};
+use nalgebra::*;
 use yaserde::xml;
 use yaserde::xml::attribute::OwnedAttribute;
 use yaserde::xml::namespace::Namespace;
-use nalgebra::*;
+use yaserde::{de, ser, YaDeserialize, YaSerialize};
+use yaserde_derive::{YaDeserialize, YaSerialize};
 
-// Most of the structs are generated automatically from the 
+// Most of the structs are generated automatically from the
 include!(concat!(env!("OUT_DIR"), "/sdf.rs"));
-
 
 // Manually declare plugin
 #[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]
 #[yaserde(rename = "plugin")]
-pub struct SdfPlugin {
-
-}
+pub struct SdfPlugin {}
 
 // Frame is another wierdo
 #[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]
 #[yaserde(rename = "frame")]
-pub struct SdfFrame {
-
-}
+pub struct SdfFrame {}
 /*impl pose {
     pub fn get_pose(&self) -> String
     {
@@ -40,7 +35,7 @@ pub struct SdfFrame {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3d {
-    pub data: Vector3<f64>
+    pub data: Vector3<f64>,
 }
 
 impl YaDeserialize for Vector3d {
@@ -52,24 +47,24 @@ impl YaDeserialize for Vector3d {
             if sz.len() != 3 {
                 return Err("Expected 3 items in Vec3 field".to_string());
             }
-    
+
             let x = sz[0].parse::<f64>();
             let y = sz[1].parse::<f64>();
             let z = sz[2].parse::<f64>();
-    
+
             if let Ok(x) = x {
                 if let Ok(y) = y {
                     if let Ok(z) = z {
-                        return Ok(Vector3d{data: Vector3::new(x, y, z)});
+                        return Ok(Vector3d {
+                            data: Vector3::new(x, y, z),
+                        });
                     }
                 }
             }
             return Err("Unable to parse Vector3 into floats".to_string());
-            
         } else {
             return Err("String of elements not found while parsing Vec3".to_string());
         }
-        
     }
 }
 
@@ -90,7 +85,7 @@ impl YaSerialize for Vector3d {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3i {
-    pub data: Vector3<i64>
+    pub data: Vector3<i64>,
 }
 
 impl YaDeserialize for Vector3i {
@@ -102,24 +97,24 @@ impl YaDeserialize for Vector3i {
             if sz.len() != 3 {
                 return Err("Expected 3 items in Vec3 field".to_string());
             }
-    
+
             let x = sz[0].parse::<i64>();
             let y = sz[1].parse::<i64>();
             let z = sz[2].parse::<i64>();
-    
+
             if let Ok(x) = x {
                 if let Ok(y) = y {
                     if let Ok(z) = z {
-                        return Ok(Vector3i{data: Vector3::new(x, y, z)});
+                        return Ok(Vector3i {
+                            data: Vector3::new(x, y, z),
+                        });
                     }
                 }
             }
             return Err("Unable to parse Vector3 into floats".to_string());
-            
         } else {
             return Err("String of elements not found while parsing Vec3".to_string());
         }
-        
     }
 }
 
