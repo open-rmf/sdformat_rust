@@ -4,11 +4,9 @@ use yaserde::de::from_str;
 use sdformat_rs::SdfCamera;
 
 #[test]
-fn test_camera_fragment()
-{
+fn test_camera_fragment() {
     use yaserde::de::from_str;
-    let test_syntax =
-        r#"<camera>
+    let test_syntax = r#"<camera>
             <horizontal_fov>1.047</horizontal_fov>
             <image>
                 <width>320</width>
@@ -22,11 +20,10 @@ fn test_camera_fragment()
     let fr = from_str::<SdfCamera>(test_syntax);
     assert!(matches!(fr, Ok(_)));
 }
- 
+
 use sdformat_rs::SdfPose;
 #[test]
-fn test_pose_fragment()
-{
+fn test_pose_fragment() {
     let test_syntax = "<pose>1 0 0 0 0 0</pose>";
     let fr = from_str::<SdfPose>(test_syntax);
     assert!(matches!(fr, Ok(_)));
