@@ -1,6 +1,7 @@
+use nalgebra::Vector;
 use yaserde::de::from_str;
 
-/*use sdformat_rs::camera;
+use sdformat_rs::SdfCamera;
 
 #[test]
 fn test_camera_fragment()
@@ -18,26 +19,29 @@ fn test_camera_fragment()
                 <far>100</far>
             </clip>
         </camera>"#;
-    let fr = from_str::<camera>(test_syntax);
+    let fr = from_str::<SdfCamera>(test_syntax);
     assert!(matches!(fr, Ok(_)));
-}*/
-
-/*use sdformat_rs::pose;
+}
+ 
+use sdformat_rs::SdfPose;
 #[test]
 fn test_pose_fragment()
 {
-    let test_syntax = "<pose>0 0 0</pose>";
-    let fr = from_str::<pose>(test_syntax);
+    let test_syntax = "<pose>1 0 0 0 0 0</pose>";
+    let fr = from_str::<SdfPose>(test_syntax);
     assert!(matches!(fr, Ok(_)));
 
     if let Ok(pose) = fr {
-        assert_eq!(pose.get_pose(), "0 0 0".to_string());
+        let pose = pose.get_pose();
+        assert!(matches!(pose, Ok(_)));
+        assert_eq!(pose.unwrap().translation, Vector3::new(1.0, 0.0, 0.0));
     }
-}*/
+}
+
 use nalgebra::Vector3;
 use sdformat_rs::SdfBoxShape;
 #[test]
-fn test_camera_fragment() {
+fn test_box_fragment() {
     let test_syntax = "<box><size>0 0 1</size></box>";
     let fr = from_str::<SdfBoxShape>(test_syntax);
     assert!(matches!(fr, Ok(_)));
