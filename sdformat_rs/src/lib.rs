@@ -19,6 +19,7 @@ pub struct SdfPlugin {}
 
 // Frame is another wierdo. For some reason it refuses to serialize/deserialize automatically
 // Hence the manual definition
+// Todo(arjo): Actually implement Frame.
 #[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]
 #[yaserde(rename = "frame")]
 pub struct SdfFrame {}
