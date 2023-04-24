@@ -20,9 +20,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Install nightly
+    - name: Install style
       run: |
-        rustup default nightly
+        rustup component add rustfmt
     - uses: actions/checkout@v3
     - name: Style
       run: |
