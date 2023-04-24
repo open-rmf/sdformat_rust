@@ -1,5 +1,6 @@
 extern crate yaserde_derive;
 use std::io::{Read, Write};
+use std::string::ParseError;
 
 use nalgebra::*;
 use yaserde::xml;
@@ -16,22 +17,89 @@ include!(concat!(env!("OUT_DIR"), "/sdf.rs"));
 #[yaserde(rename = "plugin")]
 pub struct SdfPlugin {}
 
-// Frame is another wierdo
+// Frame is another wierdo. For some reason it refuses to serialize/deserialize automatically
+// Hence the manual definition
 #[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]
 #[yaserde(rename = "frame")]
 pub struct SdfFrame {}
-/*impl pose {
-    pub fn get_pose(&self) -> String
-    {
-        if let Some(degrees) = self._degrees {
-            if degrees {
-                // TODO(arjo): Pose parsing code
+
+/// Simple implementation of pose
+pub struct Pose {
+    /// Translation vector
+    pub translation: Vector3<f64>,
+    /// Rotation
+    pub rotation: Rotation3<f64>,
+    /// Relative pose
+    pub relative_to: String,
+}
+
+impl SdfPose {
+    /// Lazily retrieve the pose as an Isometry
+    /// In the event the pose is not parseable it returns a String based error.
+    pub fn get_pose(&self) -> Result<Pose, String> {
+        let digits_raw = self.data.split_whitespace().map(|dig| dig.parse::<f64>());
+
+        let mut digits = vec![];
+        for dig in digits_raw {
+            if let Ok(dig) = dig {
+                digits.push(dig);
+            } else {
+                return Err("Failed to parse Isometry from ".to_string());
             }
         }
 
-        self.data.clone()
+        let mut frame = "".to_string();
+
+        if let Some(fr) = &self.relative_to {
+            frame = fr.clone();
+        }
+
+        if digits.len() == 6 {
+            let translation = Vector3::new(digits[0], digits[1], digits[2]);
+            if let Some(degrees) = self.degrees {
+                let rot = if degrees {
+                    // TODO(arjo): Pose parsing code
+                    use std::f64::consts::PI;
+                    Rotation3::from_euler_angles(
+                        digits[3] / PI * 180.0,
+                        digits[4] / PI * 180.0,
+                        digits[5] / PI * 180.0,
+                    )
+                } else {
+                    Rotation3::from_euler_angles(digits[3], digits[4], digits[5])
+                };
+                return Ok(Pose {
+                    translation: translation,
+                    rotation: rot,
+                    relative_to: frame,
+                });
+            } else {
+                let rot = Rotation3::from_euler_angles(digits[3], digits[4], digits[5]);
+
+                return Ok(Pose {
+                    translation: translation,
+                    rotation: rot,
+                    relative_to: frame,
+                });
+            }
+        } else if digits.len() == 7 {
+            let translation = Vector3::new(digits[0], digits[1], digits[2]);
+            let (_norm, half_angle, axis) =
+                Quaternion::new(digits[3], digits[4], digits[5], digits[6]).polar_decomposition();
+            let rot = if let Some(axis) = axis {
+                Rotation3::from_axis_angle(&axis, half_angle * 2.0)
+            } else {
+                Rotation3::from_axis_angle(&Vector3::y_axis(), half_angle * 2.0)
+            };
+            return Ok(Pose {
+                translation: translation,
+                rotation: rot,
+                relative_to: frame,
+            });
+        }
+        Err("Failed to parse pose".to_string())
     }
-}*/
+}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3d {
