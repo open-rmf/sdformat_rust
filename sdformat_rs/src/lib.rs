@@ -1,12 +1,11 @@
 extern crate yaserde_derive;
 use std::io::{Read, Write};
-use std::string::ParseError;
 
 use nalgebra::*;
 use yaserde::xml;
 use yaserde::xml::attribute::OwnedAttribute;
 use yaserde::xml::namespace::Namespace;
-use yaserde::{de, ser, YaDeserialize, YaSerialize};
+use yaserde::{YaDeserialize, YaSerialize};
 use yaserde_derive::{YaDeserialize, YaSerialize};
 
 // Most of the structs are generated automatically from the
@@ -75,12 +74,12 @@ impl SdfPose {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| format!("Failed to parse pose values from {:?}", self.data))?;
 
-        let frame = self.relative_to.clone().unwrap_or_default();
+        let relative_to = self.relative_to.clone().unwrap_or_default();
 
         if digits.len() == 6 {
             let translation = Vector3::new(digits[0], digits[1], digits[2]);
             if let Some(degrees) = self.degrees {
-                let rot = if degrees {
+                let rotation = if degrees {
                     // TODO(arjo): Pose parsing code
                     use std::f64::consts::PI;
                     Rotation3::from_euler_angles(
@@ -92,32 +91,32 @@ impl SdfPose {
                     Rotation3::from_euler_angles(digits[3], digits[4], digits[5])
                 };
                 return Ok(Pose {
-                    translation: translation,
-                    rotation: rot,
-                    relative_to: frame,
+                    translation,
+                    rotation,
+                    relative_to,
                 });
             } else {
-                let rot = Rotation3::from_euler_angles(digits[3], digits[4], digits[5]);
+                let rotation = Rotation3::from_euler_angles(digits[3], digits[4], digits[5]);
 
                 return Ok(Pose {
-                    translation: translation,
-                    rotation: rot,
-                    relative_to: frame,
+                    translation,
+                    rotation,
+                    relative_to,
                 });
             }
         } else if digits.len() == 7 {
             let translation = Vector3::new(digits[0], digits[1], digits[2]);
             let (_norm, half_angle, axis) =
                 Quaternion::new(digits[3], digits[4], digits[5], digits[6]).polar_decomposition();
-            let rot = if let Some(axis) = axis {
+            let rotation = if let Some(axis) = axis {
                 Rotation3::from_axis_angle(&axis, half_angle * 2.0)
             } else {
                 Rotation3::from_axis_angle(&Vector3::y_axis(), half_angle * 2.0)
             };
             return Ok(Pose {
-                translation: translation,
-                rotation: rot,
-                relative_to: frame,
+                translation,
+                rotation,
+                relative_to,
             });
         }
         Err("Failed to parse pose".to_string())
@@ -142,9 +141,9 @@ impl YaDeserialize for Vector3d {
                 return Err("Expected 3 items in Vec3 field".to_string());
             }
 
-            return Ok(Vector3d(Vector3::new(sz[0], sz[1], sz[2])));
+            Ok(Vector3d(Vector3::new(sz[0], sz[1], sz[2])))
         } else {
-            return Err("String of elements not found while parsing Vec3".to_string());
+            Err("String of elements not found while parsing Vec3".to_string())
         }
     }
 }
@@ -182,10 +181,9 @@ impl YaDeserialize for Vector3i {
                 return Err("Expected 3 items in Vec3 field".to_string());
             }
 
-            return Ok(Vector3i(Vector3::new(sz[0], sz[1], sz[2])));
-
+            Ok(Vector3i(Vector3::new(sz[0], sz[1], sz[2])))
         } else {
-            return Err("String of elements not found while parsing Vec3".to_string());
+            Err("String of elements not found while parsing Vec3".to_string())
         }
     }
 }
