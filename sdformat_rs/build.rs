@@ -294,9 +294,7 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
                 } else if el.name == "include" {
                     let incl = SDFIncludes {
                         filename: el.attributes.get("filename").unwrap().to_string(),
-                        required: RequiredStatus::from_str(
-                            el.attributes.get("required").unwrap(),
-                        ),
+                        required: RequiredStatus::from_str(el.attributes.get("required").unwrap()),
                     };
                     model.child_includes.push(incl);
                 } else if el.name == "description" {
