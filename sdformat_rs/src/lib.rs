@@ -149,7 +149,7 @@ impl YaDeserialize for Vector3d {
 }
 
 impl YaSerialize for Vector3d {
-    fn serialize<W: Write>(&self, writer: &mut yaserde::ser::Serializer<W>) -> Result<(), String> {
+    fn serialize<W: Write>(&self, _writer: &mut yaserde::ser::Serializer<W>) -> Result<(), String> {
         // serializer code
         Err("Not yet implemented".to_string())
     }
@@ -189,7 +189,7 @@ impl YaDeserialize for Vector3i {
 }
 
 impl YaSerialize for Vector3i {
-    fn serialize<W: Write>(&self, writer: &mut yaserde::ser::Serializer<W>) -> Result<(), String> {
+    fn serialize<W: Write>(&self, _writer: &mut yaserde::ser::Serializer<W>) -> Result<(), String> {
         // serializer code
         Err("Not yet implemented".to_string())
     }

@@ -340,7 +340,7 @@ fn main() {
     }
 
     // For debug
-    fs::write("test_codegen.rs", contents.clone());
+    fs::write("test_codegen.rs", contents.clone()).unwrap();
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("sdf.rs");
