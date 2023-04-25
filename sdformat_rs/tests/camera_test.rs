@@ -45,7 +45,7 @@ fn test_box_fragment() {
 
     if let Ok(box_shape) = fr {
         assert!(
-            (box_shape.size.data - Vector3::<f64>::new(0.0, 0.0, 1.0))
+            (box_shape.size.0 - Vector3::<f64>::new(0.0, 0.0, 1.0))
                 .norm()
                 .abs()
                 < 0.000001

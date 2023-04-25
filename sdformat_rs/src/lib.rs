@@ -68,22 +68,14 @@ impl SdfPose {
     /// Lazily retrieve the pose as an Isometry
     /// In the event the pose is not parseable it returns a String based error.
     pub fn get_pose(&self) -> Result<Pose, String> {
-        let digits_raw = self.data.split_whitespace().map(|dig| dig.parse::<f64>());
+        let digits = self
+            .data
+            .split_whitespace()
+            .map(|dig| dig.parse::<f64>())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| format!("Failed to parse pose values from {:?}", self.data))?;
 
-        let mut digits = vec![];
-        for dig in digits_raw {
-            if let Ok(dig) = dig {
-                digits.push(dig);
-            } else {
-                return Err("Failed to parse Isometry from ".to_string());
-            }
-        }
-
-        let mut frame = "".to_string();
-
-        if let Some(fr) = &self.relative_to {
-            frame = fr.clone();
-        }
+        let frame = self.relative_to.clone().unwrap_or_default();
 
         if digits.len() == 6 {
             let translation = Vector3::new(digits[0], digits[1], digits[2]);
@@ -133,34 +125,24 @@ impl SdfPose {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Vector3d {
-    pub data: Vector3<f64>,
-}
+pub struct Vector3d(pub Vector3<f64>);
 
 impl YaDeserialize for Vector3d {
     fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
         // deserializer code
         reader.next_event()?;
         if let Ok(xml::reader::XmlEvent::Characters(v)) = reader.peek() {
-            let sz: Vec<&str> = v.split_whitespace().collect();
+            let sz = v
+                .split_whitespace()
+                .map(|x| x.parse::<f64>())
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| "Unable to parse Vector3 into floats".to_string())?;
+
             if sz.len() != 3 {
                 return Err("Expected 3 items in Vec3 field".to_string());
             }
 
-            let x = sz[0].parse::<f64>();
-            let y = sz[1].parse::<f64>();
-            let z = sz[2].parse::<f64>();
-
-            if let Ok(x) = x {
-                if let Ok(y) = y {
-                    if let Ok(z) = z {
-                        return Ok(Vector3d {
-                            data: Vector3::new(x, y, z),
-                        });
-                    }
-                }
-            }
-            return Err("Unable to parse Vector3 into floats".to_string());
+            return Ok(Vector3d(Vector3::new(sz[0], sz[1], sz[2])));
         } else {
             return Err("String of elements not found while parsing Vec3".to_string());
         }
@@ -183,34 +165,25 @@ impl YaSerialize for Vector3d {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Vector3i {
-    pub data: Vector3<i64>,
-}
+pub struct Vector3i(pub Vector3<i64>);
 
 impl YaDeserialize for Vector3i {
     fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
         // deserializer code
         reader.next_event()?;
         if let Ok(xml::reader::XmlEvent::Characters(v)) = reader.peek() {
-            let sz: Vec<&str> = v.split_whitespace().collect();
+            let sz = v
+                .split_whitespace()
+                .map(|x| x.parse::<i64>())
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| "Unable to parse Vector3 into ints".to_string())?;
+
             if sz.len() != 3 {
                 return Err("Expected 3 items in Vec3 field".to_string());
             }
 
-            let x = sz[0].parse::<i64>();
-            let y = sz[1].parse::<i64>();
-            let z = sz[2].parse::<i64>();
+            return Ok(Vector3i(Vector3::new(sz[0], sz[1], sz[2])));
 
-            if let Ok(x) = x {
-                if let Ok(y) = y {
-                    if let Ok(z) = z {
-                        return Ok(Vector3i {
-                            data: Vector3::new(x, y, z),
-                        });
-                    }
-                }
-            }
-            return Err("Unable to parse Vector3 into floats".to_string());
         } else {
             return Err("String of elements not found while parsing Vec3".to_string());
         }
