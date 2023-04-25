@@ -52,3 +52,12 @@ fn test_box_fragment() {
         );
     }
 }
+
+use sdformat_rs::SdfGeometry;
+#[test]
+fn test_geometry_enum() {
+    let test_syntax = "<geometry><box><size>0 0 1</size></box></geometry>";
+    let fr = from_str::<SdfGeometry>(test_syntax);
+    assert!(matches!(fr, Ok(_)));
+    assert!(matches!(fr.unwrap(), SdfGeometry::Box(_)));
+}

@@ -13,16 +13,46 @@ use yaserde_derive::{YaDeserialize, YaSerialize};
 include!(concat!(env!("OUT_DIR"), "/sdf.rs"));
 
 // Manually declare plugin
-#[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]
+#[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]
 #[yaserde(rename = "plugin")]
 pub struct SdfPlugin {}
 
 // Frame is another wierdo. For some reason it refuses to serialize/deserialize automatically
 // Hence the manual definition
 // Todo(arjo): Actually implement Frame.
-#[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]
+#[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]
 #[yaserde(rename = "frame")]
 pub struct SdfFrame {}
+
+// Geometry should really be an enum rather than a list of Options, redefine it here
+/// The shape of the visual or collision object.
+#[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]
+#[yaserde(rename = "geometry")]
+pub enum SdfGeometry {
+    #[yaserde(child, rename = "empty")]
+    #[default]
+    Empty,
+    #[yaserde(child, rename = "box")]
+    r#Box(SdfBoxShape),
+    #[yaserde(child, rename = "capsule")]
+    Capsule(SdfCapsuleShape),
+    #[yaserde(child, rename = "cylinder")]
+    Cylinder(SdfCylinderShape),
+    #[yaserde(child, rename = "ellipsoid")]
+    Ellipsoid(SdfEllipsoidShape),
+    #[yaserde(child, rename = "heightmap")]
+    Heightmap(SdfHeightmapShape),
+    #[yaserde(child, rename = "image")]
+    Image(SdfImageShape),
+    #[yaserde(child, rename = "mesh")]
+    Mesh(SdfMeshShape),
+    #[yaserde(child, rename = "plane")]
+    Plane(SdfPlaneShape),
+    #[yaserde(child, rename = "polyline")]
+    Polyline(SdfPolylineShape),
+    #[yaserde(child, rename = "sphere")]
+    Sphere(SdfSphereShape),
+}
 
 /// Simple implementation of pose
 pub struct Pose {

@@ -160,7 +160,7 @@ impl SDFElement {
                 out += "\n";
             }
         }
-        out += "#[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]\n";
+        out += "#[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]\n";
         out += format!("#[yaserde(rename = \"{}\")]\n", self.properties.name).as_str();
         if self.top_level {
             out += format!("pub struct {}{} {{\n", prefix_type(prefix), self.typename()).as_str();
@@ -336,7 +336,7 @@ fn main() {
 
     let mut contents = "".to_string();
     for (file, model) in &hashmap {
-        if file == "plugin.sdf" || file == "frame.sdf" {
+        if file == "plugin.sdf" || file == "frame.sdf" || file == "geometry.sdf" {
             //Skip
             continue;
         }
