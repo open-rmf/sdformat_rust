@@ -30,6 +30,7 @@ fn get_storage_type<'a>(type_str: &str) -> &'a str {
     return "String";
 }
 
+#[derive(Debug, Copy, Clone)]
 enum RequiredStatus {
     Optional,
     One,
@@ -190,7 +191,7 @@ impl SDFElement {
                     child
                         .properties
                         .required
-                        .wrap_type(typename.to_case(Case::Pascal).as_str())
+                        .wrap_type(typename.to_case(Case::Pascal).as_str()),
                 )
                 .as_str();
             } else {
@@ -210,10 +211,11 @@ impl SDFElement {
                     .required
                     .wrap_type(&("Sdf".to_string() + element.typename().as_str()));
                 out += format!(
-                    "  #[yaserde(child, rename = \"{}\")]\n  pub {} : {},\n",
+                    "  #[yaserde(child, rename = \"{}\")]\n  pub {} : {} /*{:?}*/,\n",
                     element.properties.name.to_case(Case::Snake),
                     &sanitize_field(&element.properties.name.to_case(Case::Snake)),
-                    typename
+                    typename,
+                    child.required
                 )
                 .as_str();
             } else {
@@ -293,7 +295,7 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
                     let incl = SDFIncludes {
                         filename: el.attributes.get("filename").unwrap().to_string(),
                         required: RequiredStatus::from_str(
-                            element.attributes.get("required").unwrap(),
+                            el.attributes.get("required").unwrap(),
                         ),
                     };
                     model.child_includes.push(incl);
