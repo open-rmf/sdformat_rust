@@ -123,6 +123,8 @@ impl SdfPose {
     }
 }
 
+pub use yaserde::de::from_str;
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3d(pub Vector3<f64>);
 
