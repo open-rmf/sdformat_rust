@@ -6,12 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-yaserde={version = "0.8.0"}
-yaserde_derive="0.8.0"
+yaserde={version = "0.7.0"}
+yaserde_derive="0.7.0"
 nalgebra = "0.31.4"
-sdformat_type_support = {path="../sdformat_type_support"}
 
 [build-dependencies]
 minidom="0.15.0"
 xmltree = "0.10"
-tera = "1"
+convert_case = "0.6.0"
+
