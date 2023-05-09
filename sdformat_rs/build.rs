@@ -1,8 +1,8 @@
 use convert_case::{Case, Casing};
-use minidom::element;
-use std::collections::{hash_map, HashSet};
+
+use std::collections::HashSet;
 use std::error::Error;
-use std::fmt::format;
+
 use std::fs;
 use std::io::Cursor;
 use std::path::Path;
@@ -27,7 +27,7 @@ fn get_storage_type<'a>(type_str: &str) -> &'a str {
     if type_str == "vector3" {
         return "Vector3d";
     }
-    return "String";
+    "String"
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -43,9 +43,7 @@ impl RequiredStatus {
             RequiredStatus::Optional => {
                 format!("Option<{}>", type_str)
             }
-            RequiredStatus::One => {
-                format!("{}", type_str)
-            }
+            RequiredStatus::One => type_str.to_string(),
             RequiredStatus::Many => {
                 format!("Vec<{}>", type_str)
             }
@@ -154,13 +152,13 @@ impl SDFElement {
     fn code_gen(&self, prefix: &str, file_map: &HashMap<String, SDFElement>) -> String {
         let mut out = "".to_string();
         out += format!("// Generated from {}\n", self.source_file).as_str();
-        if (self.properties.description != "") {
-            for line in self.properties.description.split("\n") {
+        if !self.properties.description.is_empty() {
+            for line in self.properties.description.split('\n') {
                 out += &("/// ".to_string() + line);
                 out += "\n";
             }
         }
-        out += "#[derive(Default, PartialEq, Debug, YaSerialize, YaDeserialize)]\n";
+        out += "#[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]\n";
         out += format!("#[yaserde(rename = \"{}\")]\n", self.properties.name).as_str();
         if self.top_level {
             out += format!("pub struct {}{} {{\n", prefix_type(prefix), self.typename()).as_str();
@@ -179,7 +177,7 @@ impl SDFElement {
         let mut child_gen = "".to_string();
         let name = prefix.to_string().to_case(Case::Pascal) + self.properties.name.as_str();
         for child in &self.child_elems {
-            if child.properties.rtype == "" {
+            if child.properties.rtype.is_empty() {
                 // TODO(arjo): Handle includes
                 let prefix = prefix_type(&name);
                 child_gen += child.code_gen(prefix.as_str(), file_map).as_str();
@@ -222,8 +220,8 @@ impl SDFElement {
                 panic!("Unable to find element for file: {}", child.filename);
             }
         }
-        if self.properties.rtype.len() > 0 {
-            out += format!("#[yaserde(text)]\n   data: String\n").as_str(); //format!("data: {}", self.properties.rtype).as_str();
+        if !self.properties.rtype.is_empty() {
+            out += "#[yaserde(text)]\n   data: String\n".to_string().as_str(); //format!("data: {}", self.properties.rtype).as_str();
         }
         out += "}\n\n";
         out += child_gen.as_str();
@@ -280,51 +278,49 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
     }
 
     for child in &element.children {
-        match child {
-            XMLNode::Element(el) => {
-                if el.name == "attribute" {
-                    parse_element(model, &el);
-                } else if el.name == "element" {
-                    if el.attributes.contains_key("ref") {
-                    } else {
-                        let mut elem = SDFElement::new();
-                        parse_element(&mut elem, &el);
-                        model.child_elems.push(elem);
-                    }
-                } else if el.name == "include" {
-                    let incl = SDFIncludes {
-                        filename: el.attributes.get("filename").unwrap().to_string(),
-                        required: RequiredStatus::from_str(el.attributes.get("required").unwrap()),
-                    };
-                    model.child_includes.push(incl);
-                } else if el.name == "description" {
-                    if let Some(desc) = el.get_text() {
-                        model.properties.description = desc.to_string();
-                    }
+        if let XMLNode::Element(el) = child {
+            if el.name == "attribute" {
+                parse_element(model, el);
+            } else if el.name == "element" {
+                if el.attributes.contains_key("ref") {
+                } else {
+                    let mut elem = SDFElement::new();
+                    parse_element(&mut elem, el);
+                    model.child_elems.push(elem);
+                }
+            } else if el.name == "include" {
+                let incl = SDFIncludes {
+                    filename: el.attributes.get("filename").unwrap().to_string(),
+                    required: RequiredStatus::from_str(el.attributes.get("required").unwrap()),
+                };
+                model.child_includes.push(incl);
+            } else if el.name == "description" {
+                if let Some(desc) = el.get_text() {
+                    model.properties.description = desc.to_string();
                 }
             }
-            _ => {}
         }
     }
 }
 
 fn read_all_specs() -> Result<HashMap<String, SDFElement>, String> {
     let mut res = HashMap::new();
-    for file in std::fs::read_dir("sdformat_spec/1.10").unwrap() {
-        if let Ok(dir_entry) = file {
-            if !dir_entry.metadata().unwrap().is_file() {
-                continue;
-            }
-            if let Some(sdf) = dir_entry.path().extension() {
-                if sdf == "sdf" {
-                    let spec = read_spec(dir_entry.path().to_str().unwrap()).unwrap();
-                    let mut model = SDFElement::new();
-                    parse_element(&mut model, &spec);
-                    model.top_level = true;
-                    model.set_source(dir_entry.file_name().to_str().unwrap());
-                    res.insert(dir_entry.file_name().to_str().unwrap().to_string(), model);
-                }
-            }
+    for dir_entry in std::fs::read_dir("sdformat_spec/1.10").unwrap().flatten() {
+        if !dir_entry.metadata().unwrap().is_file() {
+            continue;
+        }
+        if dir_entry
+            .path()
+            .extension()
+            .and_then(|e| e.to_str())
+            .eq(&Some("sdf"))
+        {
+            let spec = read_spec(dir_entry.path().to_str().unwrap()).unwrap();
+            let mut model = SDFElement::new();
+            parse_element(&mut model, &spec);
+            model.top_level = true;
+            model.set_source(dir_entry.file_name().to_str().unwrap());
+            res.insert(dir_entry.file_name().to_str().unwrap().to_string(), model);
         }
     }
 
@@ -334,9 +330,9 @@ fn read_all_specs() -> Result<HashMap<String, SDFElement>, String> {
 fn main() {
     let hashmap = read_all_specs().unwrap();
 
-    let mut contents = "".to_string();
+    let mut contents = String::new();
     for (file, model) in &hashmap {
-        if file == "plugin.sdf" || file == "frame.sdf" {
+        if file == "plugin.sdf" || file == "frame.sdf" || file == "geometry.sdf" {
             //Skip
             continue;
         }
@@ -344,10 +340,10 @@ fn main() {
     }
 
     // For debug
-    fs::write("test_codegen.rs", contents.clone());
+    fs::write("test_codegen.rs", contents.clone()).unwrap();
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("sdf.rs");
-    fs::write(&dest_path, contents).unwrap();
+    fs::write(dest_path, contents).unwrap();
     println!("cargo:rerun-if-changed=build.rs");
 }

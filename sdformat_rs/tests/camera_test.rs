@@ -45,10 +45,19 @@ fn test_box_fragment() {
 
     if let Ok(box_shape) = fr {
         assert!(
-            (box_shape.size.data - Vector3::<f64>::new(0.0, 0.0, 1.0))
+            (box_shape.size.0 - Vector3::<f64>::new(0.0, 0.0, 1.0))
                 .norm()
                 .abs()
                 < 0.000001
         );
     }
+}
+
+use sdformat_rs::SdfGeometry;
+#[test]
+fn test_geometry_enum() {
+    let test_syntax = "<geometry><box><size>0 0 1</size></box></geometry>";
+    let fr = from_str::<SdfGeometry>(test_syntax);
+    assert!(matches!(fr, Ok(_)));
+    assert!(matches!(fr.unwrap(), SdfGeometry::Box(_)));
 }
