@@ -151,14 +151,17 @@ impl YaDeserialize for Vector3d {
 }
 
 impl YaSerialize for Vector3d {
-    fn serialize<W: Write>(&self, serializer: &mut yaserde::ser::Serializer<W>) -> Result<(), String> {
+    fn serialize<W: Write>(
+        &self,
+        serializer: &mut yaserde::ser::Serializer<W>,
+    ) -> Result<(), String> {
         // serializer code
-        serializer.write(
-            xml::writer::XmlEvent::Characters(&format!(
-            "{} {} {}",
-            self.0.x, self.0.y, self.0.z
-        )))
-        .map_err(|e| e.to_string())?;
+        serializer
+            .write(xml::writer::XmlEvent::Characters(&format!(
+                "{} {} {}",
+                self.0.x, self.0.y, self.0.z
+            )))
+            .map_err(|e| e.to_string())?;
 
         Ok(())
     }
@@ -198,14 +201,17 @@ impl YaDeserialize for Vector3i {
 }
 
 impl YaSerialize for Vector3i {
-    fn serialize<W: Write>(&self, serializer: &mut yaserde::ser::Serializer<W>) -> Result<(), String> {
+    fn serialize<W: Write>(
+        &self,
+        serializer: &mut yaserde::ser::Serializer<W>,
+    ) -> Result<(), String> {
         // serializer code
-        serializer.write(
-            xml::writer::XmlEvent::Characters(&format!(
-            "{} {} {}",
-            self.0.x, self.0.y, self.0.z
-        )))
-        .map_err(|e| e.to_string())?;
+        serializer
+            .write(xml::writer::XmlEvent::Characters(&format!(
+                "{} {} {}",
+                self.0.x, self.0.y, self.0.z
+            )))
+            .map_err(|e| e.to_string())?;
 
         Ok(())
     }
