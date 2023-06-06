@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 yaserde={version = "0.7.0"}
 yaserde_derive="0.7.0"
-nalgebra = "0.31.4"
+nalgebra = "0.32.2"
 
 [build-dependencies]
 minidom="0.15.0"
