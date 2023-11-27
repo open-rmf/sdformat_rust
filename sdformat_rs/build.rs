@@ -53,7 +53,7 @@ impl RequiredStatus {
     fn from_str(required: &str) -> RequiredStatus {
         if required == "true" || required == "1" {
             return RequiredStatus::One;
-        } else if required == "*" {
+        } else if required == "*" || required == "+" {
             return RequiredStatus::Many;
         }
         RequiredStatus::Optional
