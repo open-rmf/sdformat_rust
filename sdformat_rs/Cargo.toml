@@ -11,7 +11,6 @@ yaserde_derive="0.7.0"
 nalgebra = "0.32.2"
 
 [build-dependencies]
-minidom="0.15.0"
 xmltree = "0.10"
 convert_case = "0.6.0"
 
