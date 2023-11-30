@@ -305,6 +305,12 @@ pub use yaserde::de::from_str;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3d(pub Vector3<f64>);
 
+impl Vector3d {
+    pub fn new(x: f64, y:f64, z:f64) -> Self {
+        Self(Vector3::new(x, y, z))
+    }
+}
+
 impl YaDeserialize for Vector3d {
     fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
         // deserializer code
@@ -354,6 +360,12 @@ impl YaSerialize for Vector3d {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3i(pub Vector3<i64>);
+
+impl Vector3i {
+    pub fn new(x: i64, y:i64, z:i64) -> Self {
+        Self(Vector3::new(x, y, z))
+    }
+}
 
 impl YaDeserialize for Vector3i {
     fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
