@@ -61,3 +61,15 @@ fn test_geometry_enum() {
     assert!(matches!(fr, Ok(_)));
     assert!(matches!(fr.unwrap(), SdfGeometry::Box(_)));
 }
+
+use sdformat_rs::{SdfLight, Vector3d};
+#[test]
+fn test_light_direction_pose() {
+    let light = SdfLight {
+        direction: Vector3d::new(4.0, 5.0, 6.0),
+        ..Default::default()
+    };
+    let serialized = yaserde::ser::to_string(&light);
+    dbg!(&serialized);
+    panic!();
+}
