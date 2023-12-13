@@ -5,6 +5,7 @@ use nalgebra::*;
 use yaserde::xml;
 use yaserde::xml::attribute::OwnedAttribute;
 use yaserde::xml::namespace::Namespace;
+
 use yaserde::{YaDeserialize, YaSerialize};
 use yaserde_derive::{YaDeserialize, YaSerialize};
 
@@ -128,6 +129,12 @@ pub use yaserde::de::from_str;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3d(pub Vector3<f64>);
 
+impl Vector3d {
+    pub fn new(x: f64, y: f64, z: f64) -> Self {
+        Vector3d(Vector3::new(x, y, z))
+    }
+}
+
 impl YaDeserialize for Vector3d {
     fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
         // deserializer code
@@ -156,13 +163,24 @@ impl YaSerialize for Vector3d {
         serializer: &mut yaserde::ser::Serializer<W>,
     ) -> Result<(), String> {
         // serializer code
+        let Some(yaserde_label) = serializer.get_start_event_name() else {
+            return Err("vector3d is a primitive".to_string());
+        };
+        let struct_start_event =
+            yaserde::xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
+
+        serializer
+            .write(struct_start_event)
+            .map_err(|e| e.to_string())?;
         serializer
             .write(xml::writer::XmlEvent::Characters(&format!(
                 "{} {} {}",
                 self.0.x, self.0.y, self.0.z
             )))
             .map_err(|e| e.to_string())?;
-
+        serializer
+            .write(yaserde::xml::writer::XmlEvent::end_element())
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -171,6 +189,7 @@ impl YaSerialize for Vector3d {
         attributes: Vec<OwnedAttribute>,
         namespace: Namespace,
     ) -> Result<(Vec<OwnedAttribute>, Namespace), String> {
+        println!("{:?}", namespace);
         Ok((attributes, namespace))
     }
 }
@@ -206,13 +225,24 @@ impl YaSerialize for Vector3i {
         serializer: &mut yaserde::ser::Serializer<W>,
     ) -> Result<(), String> {
         // serializer code
+        let Some(yaserde_label) = serializer.get_start_event_name() else {
+            return Err("vector3d is a primitive".to_string());
+        };
+        let struct_start_event =
+            yaserde::xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
+
+        serializer
+            .write(struct_start_event)
+            .map_err(|e| e.to_string())?;
         serializer
             .write(xml::writer::XmlEvent::Characters(&format!(
                 "{} {} {}",
                 self.0.x, self.0.y, self.0.z
             )))
             .map_err(|e| e.to_string())?;
-
+        serializer
+            .write(yaserde::xml::writer::XmlEvent::end_element())
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
