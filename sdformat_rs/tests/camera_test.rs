@@ -62,14 +62,11 @@ fn test_geometry_enum() {
     assert!(matches!(fr.unwrap(), SdfGeometry::Box(_)));
 }
 
-use sdformat_rs::{SdfLight, Vector3d};
+use sdformat_rs::SdfLight;
 #[test]
-fn test_light_direction_pose() {
-    let light = SdfLight {
-        direction: Vector3d::new(4.0, 5.0, 6.0),
-        ..Default::default()
-    };
-    let serialized = yaserde::ser::to_string(&light);
-    dbg!(&serialized);
-    panic!();
+fn test_light_direction_pose_serdeser() {
+    let test_syntax = "<?xml version=\"1.0\" encoding=\"utf-8\"?><light name=\"test\" type=\"point\"><direction>0 0 1</direction></light>";
+    let fr = from_str::<SdfLight>(test_syntax);
+    let serialized = yaserde::ser::to_string(&fr.unwrap()).unwrap();
+    assert_eq!(test_syntax.to_string(), serialized);
 }
