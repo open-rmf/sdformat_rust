@@ -67,9 +67,9 @@ fn test_plugin() {
     let test_plugin_content = |fr: &SdfPlugin| {
         assert_eq!(fr.name, "hello");
         assert_eq!(fr.filename, "world.so");
-        assert_eq!(fr.elements.len(), 1);
-        let (box_elem_name, box_elem) = fr.elements.iter().next().unwrap();
-        assert_eq!(box_elem_name, "box");
+        assert_eq!(fr.elements.all().len(), 1);
+        let box_elem = fr.elements.all().iter().next().unwrap();
+        assert_eq!(&*box_elem.name, "box");
         assert_eq!(box_elem.attributes.len(), 1);
         let (attr_name, attr_value) = box_elem.attributes.iter().next().unwrap();
         assert_eq!(
@@ -78,9 +78,9 @@ fn test_plugin() {
         );
         match &box_elem.data {
             ElementData::Nested(data) => {
-                assert_eq!(data.len(), 1);
-                let (size_name, size_elem) = data.iter().next().unwrap();
-                assert_eq!(size_name, "size");
+                assert_eq!(data.all().len(), 1);
+                let size_elem = data.all().iter().next().unwrap();
+                assert_eq!(&*size_elem.name, "size");
                 assert_eq!(size_elem.data, ElementData::Integer(42));
             }
             _ => panic!("Expected nested element"),
@@ -95,4 +95,13 @@ fn test_plugin() {
     let fr = from_str::<SdfPlugin>(test_syntax).unwrap();
     test_plugin_content(&fr);
     assert!(to.is_ok());
+}
+
+use sdformat_rs::SdfLight;
+#[test]
+fn test_light_direction_pose_serdeser() {
+    let test_syntax = "<?xml version=\"1.0\" encoding=\"utf-8\"?><light name=\"test\" type=\"point\"><direction>0 0 1</direction></light>";
+    let fr = from_str::<SdfLight>(test_syntax);
+    let serialized = yaserde::ser::to_string(&fr.unwrap()).unwrap();
+    assert_eq!(test_syntax.to_string(), serialized);
 }

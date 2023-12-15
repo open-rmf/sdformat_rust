@@ -1,11 +1,13 @@
 extern crate yaserde_derive;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::io::{Read, Write};
+use std::sync::Arc;
 
 use nalgebra::*;
 use yaserde::xml;
 use yaserde::xml::attribute::OwnedAttribute;
 use yaserde::xml::namespace::Namespace;
+
 use yaserde::{YaDeserialize, YaSerialize};
 use yaserde_derive::{YaDeserialize, YaSerialize};
 
@@ -19,7 +21,7 @@ pub enum ElementData {
     Integer(i64),
     Double(f64),
     String(String),
-    Nested(HashMap<String, XmlElement>),
+    Nested(ElementMap),
 }
 
 impl ElementData {
@@ -34,10 +36,27 @@ impl ElementData {
     }
 }
 
-#[derive(Default, PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct XmlElement {
     pub attributes: HashMap<String, ElementData>,
+    pub name: Arc<str>,
     pub data: ElementData,
+}
+
+impl Default for XmlElement {
+    fn default() -> Self {
+        Self {
+            attributes: Default::default(),
+            name: "".into(),
+            data: Default::default(),
+        }
+    }
+}
+
+#[derive(Default, PartialEq, Clone, Debug)]
+pub struct ElementMap {
+    indexes: HashMap<Arc<str>, BTreeSet<usize>>,
+    elements: Vec<XmlElement>,
 }
 
 // Manually declare plugin
@@ -45,8 +64,36 @@ pub struct XmlElement {
 pub struct SdfPlugin {
     pub name: String,
     pub filename: String,
-    pub elements: HashMap<String, XmlElement>,
+    //pub elements: HashMap<String, XmlElement>,
+    pub elements: ElementMap,
 }
+
+impl ElementMap {
+    pub fn get(&self, name: &str) -> Option<&XmlElement> {
+        self.indexes
+            .get(name)
+            .and_then(|idxs| self.elements.get(*idxs.iter().next()?))
+    }
+
+    pub fn get_all(&self, name: &str) -> Option<Vec<&XmlElement>> {
+        self.indexes
+            .get(name)
+            .and_then(|idxs| idxs.iter().map(|idx| self.elements.get(*idx)).collect())
+    }
+
+    pub fn push(&mut self, elem: XmlElement) {
+        let idx = self.elements.len();
+        let name = elem.name.clone();
+        self.elements.push(elem);
+        self.indexes.entry(name).or_default().insert(idx);
+    }
+
+    pub fn all(&self) -> &[XmlElement] {
+        &self.elements
+    }
+}
+
+pub struct ElementMapIterator {}
 
 fn parse_data(val: &str) -> ElementData {
     if val.is_empty() {
@@ -62,14 +109,17 @@ fn parse_data(val: &str) -> ElementData {
 
 fn deserialize_element<R: Read>(
     reader: &mut yaserde::de::Deserializer<R>,
-) -> Result<(String, XmlElement), String> {
+) -> Result<XmlElement, String> {
     let (name, attributes) = match reader.next_event()? {
         xml::reader::XmlEvent::StartElement {
             name, attributes, ..
         } => (name.local_name, attributes),
         _ => return Err("Unexpected event found when deserializing plugin element".to_string()),
     };
-    let mut element = XmlElement::default();
+    let mut element = XmlElement {
+        name: name.into(),
+        ..Default::default()
+    };
     for attr in attributes.iter() {
         element
             .attributes
@@ -83,11 +133,11 @@ fn deserialize_element<R: Read>(
             reader.next_event()?;
         }
         xml::reader::XmlEvent::StartElement { .. } => {
-            let mut elements = HashMap::new();
+            let mut elements = ElementMap::default();
             // TODO(luca) make sure we are ending this element
             while !matches!(reader.peek(), Ok(xml::reader::XmlEvent::EndElement { .. })) {
-                let (name, data) = deserialize_element(reader)?;
-                elements.insert(name, data);
+                let elem = deserialize_element(reader)?;
+                elements.push(elem);
             }
             element.data = ElementData::Nested(elements);
             // Discard the next element, it is an end event
@@ -99,7 +149,7 @@ fn deserialize_element<R: Read>(
         }
         _ => return Err("Unexpected event found when deserializing plugin data".to_string()),
     };
-    Ok((name, element))
+    Ok(element)
 }
 
 impl YaDeserialize for SdfPlugin {
@@ -117,8 +167,8 @@ impl YaDeserialize for SdfPlugin {
             plugin.name = read_attribute(&attributes, "name");
             plugin.filename = read_attribute(&attributes, "filename");
             while !matches!(reader.peek()?, xml::reader::XmlEvent::EndElement { .. }) {
-                let (name, data) = deserialize_element(reader)?;
-                plugin.elements.insert(name, data);
+                let elem = deserialize_element(reader)?;
+                plugin.elements.push(elem);
             }
             Ok(plugin)
         } else {
@@ -128,11 +178,10 @@ impl YaDeserialize for SdfPlugin {
 }
 
 fn serialize_element<W: Write>(
-    name: &str,
     elem: &XmlElement,
     serializer: &mut yaserde::ser::Serializer<W>,
 ) -> Result<(), String> {
-    let mut builder = xml::writer::XmlEvent::start_element(name);
+    let mut builder = xml::writer::XmlEvent::start_element(&*elem.name);
     let converted = elem
         .attributes
         .iter()
@@ -152,8 +201,8 @@ fn serialize_element<W: Write>(
                 .map_err(|e| e.to_string())?;
         }
         ElementData::Nested(elements) => {
-            for (name, data) in elements.iter() {
-                serialize_element(name, data, serializer)?;
+            for element in elements.all().iter() {
+                serialize_element(element, serializer)?;
             }
         }
     }
@@ -175,8 +224,8 @@ impl YaSerialize for SdfPlugin {
                     .attr("filename", &self.filename),
             )
             .map_err(|e| e.to_string())?;
-        for (name, data) in &self.elements {
-            serialize_element(name, data, serializer)?;
+        for element in self.elements.elements.iter() {
+            serialize_element(element, serializer)?;
         }
         serializer
             .write(xml::writer::XmlEvent::end_element())
@@ -306,8 +355,8 @@ pub use yaserde::de::from_str;
 pub struct Vector3d(pub Vector3<f64>);
 
 impl Vector3d {
-    pub fn new(x: f64, y:f64, z:f64) -> Self {
-        Self(Vector3::new(x, y, z))
+    pub fn new(x: f64, y: f64, z: f64) -> Self {
+        Vector3d(Vector3::new(x, y, z))
     }
 }
 
@@ -339,13 +388,24 @@ impl YaSerialize for Vector3d {
         serializer: &mut yaserde::ser::Serializer<W>,
     ) -> Result<(), String> {
         // serializer code
+        let Some(yaserde_label) = serializer.get_start_event_name() else {
+            return Err("vector3d is a primitive".to_string());
+        };
+        let struct_start_event =
+            yaserde::xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
+
+        serializer
+            .write(struct_start_event)
+            .map_err(|e| e.to_string())?;
         serializer
             .write(xml::writer::XmlEvent::Characters(&format!(
                 "{} {} {}",
                 self.0.x, self.0.y, self.0.z
             )))
             .map_err(|e| e.to_string())?;
-
+        serializer
+            .write(yaserde::xml::writer::XmlEvent::end_element())
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -354,6 +414,7 @@ impl YaSerialize for Vector3d {
         attributes: Vec<OwnedAttribute>,
         namespace: Namespace,
     ) -> Result<(Vec<OwnedAttribute>, Namespace), String> {
+        println!("{:?}", namespace);
         Ok((attributes, namespace))
     }
 }
@@ -362,7 +423,7 @@ impl YaSerialize for Vector3d {
 pub struct Vector3i(pub Vector3<i64>);
 
 impl Vector3i {
-    pub fn new(x: i64, y:i64, z:i64) -> Self {
+    pub fn new(x: i64, y: i64, z: i64) -> Self {
         Self(Vector3::new(x, y, z))
     }
 }
@@ -395,13 +456,24 @@ impl YaSerialize for Vector3i {
         serializer: &mut yaserde::ser::Serializer<W>,
     ) -> Result<(), String> {
         // serializer code
+        let Some(yaserde_label) = serializer.get_start_event_name() else {
+            return Err("vector3d is a primitive".to_string());
+        };
+        let struct_start_event =
+            yaserde::xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
+
+        serializer
+            .write(struct_start_event)
+            .map_err(|e| e.to_string())?;
         serializer
             .write(xml::writer::XmlEvent::Characters(&format!(
                 "{} {} {}",
                 self.0.x, self.0.y, self.0.z
             )))
             .map_err(|e| e.to_string())?;
-
+        serializer
+            .write(yaserde::xml::writer::XmlEvent::end_element())
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
