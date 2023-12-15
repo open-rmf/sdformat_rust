@@ -64,7 +64,6 @@ pub struct ElementMap {
 pub struct SdfPlugin {
     pub name: String,
     pub filename: String,
-    //pub elements: HashMap<String, XmlElement>,
     pub elements: ElementMap,
 }
 
