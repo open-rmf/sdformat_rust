@@ -14,31 +14,47 @@ use yaserde_derive::{YaDeserialize, YaSerialize};
 // Most of the structs are generated automatically from the
 include!(concat!(env!("OUT_DIR"), "/sdf.rs"));
 
-#[derive(Default, PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum ElementData {
-    #[default]
-    Empty,
-    Integer(i64),
-    Double(f64),
     String(String),
     Nested(ElementMap),
 }
 
-impl ElementData {
-    fn to_string(&self) -> String {
-        match self {
-            ElementData::Empty => "".into(),
-            ElementData::Integer(val) => val.to_string(),
-            ElementData::Double(val) => val.to_string(),
-            ElementData::String(val) => val.clone(),
-            ElementData::Nested(_) => unreachable!(),
+impl Default for ElementData {
+    fn default() -> Self {
+        ElementData::String("".into())
+    }
+}
+
+impl TryFrom<ElementData> for f64 {
+    type Error = String;
+
+    fn try_from(e: ElementData) -> Result<Self, Self::Error> {
+        match e {
+            ElementData::String(s) => s
+                .parse::<f64>()
+                .map_err(|_| "Unable to parse into f64".to_string()),
+            ElementData::Nested(_) => Err("Nested element found".into()),
+        }
+    }
+}
+
+impl TryFrom<ElementData> for i64 {
+    type Error = String;
+
+    fn try_from(e: ElementData) -> Result<Self, Self::Error> {
+        match e {
+            ElementData::String(s) => s
+                .parse::<i64>()
+                .map_err(|_| "Unable to parse into i64".to_string()),
+            ElementData::Nested(_) => Err("Nested element found".into()),
         }
     }
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct XmlElement {
-    pub attributes: HashMap<String, ElementData>,
+    pub attributes: HashMap<String, String>,
     pub name: Arc<str>,
     pub data: ElementData,
 }
@@ -92,18 +108,6 @@ impl ElementMap {
     }
 }
 
-fn parse_data(val: &str) -> ElementData {
-    if val.is_empty() {
-        ElementData::Empty
-    } else if let Ok(val) = str::parse::<i64>(val) {
-        ElementData::Integer(val)
-    } else if let Ok(val) = str::parse::<f64>(val) {
-        ElementData::Double(val)
-    } else {
-        ElementData::String(val.into())
-    }
-}
-
 fn deserialize_element<R: Read>(
     reader: &mut yaserde::de::Deserializer<R>,
 ) -> Result<XmlElement, String> {
@@ -120,11 +124,11 @@ fn deserialize_element<R: Read>(
     for attr in attributes.iter() {
         element
             .attributes
-            .insert(attr.name.local_name.clone(), parse_data(&attr.value));
+            .insert(attr.name.local_name.clone(), attr.value.to_owned());
     }
     match reader.peek()? {
         xml::reader::XmlEvent::Characters(value) => {
-            element.data = parse_data(value);
+            element.data = ElementData::String(value.clone());
             reader.next_event()?;
             // Discard the next element, it should be an end event
             reader.next_event()?;
@@ -142,7 +146,7 @@ fn deserialize_element<R: Read>(
         }
         xml::reader::XmlEvent::EndElement { .. } => {
             reader.next_event()?;
-            element.data = ElementData::Empty
+            element.data = ElementData::default();
         }
         _ => return Err("Unexpected event found when deserializing plugin data".to_string()),
     };
@@ -179,22 +183,14 @@ fn serialize_element<W: Write>(
     serializer: &mut yaserde::ser::Serializer<W>,
 ) -> Result<(), String> {
     let mut builder = xml::writer::XmlEvent::start_element(&*elem.name);
-    let converted = elem
-        .attributes
-        .iter()
-        .map(|(name, data)| (name, data.to_string()))
-        .collect::<Vec<_>>();
-    for (name, data) in converted.iter() {
+    for (name, data) in elem.attributes.iter() {
         builder = builder.attr(xml::name::Name::local(name), data);
     }
     serializer.write(builder).map_err(|e| e.to_string())?;
     match &elem.data {
-        ElementData::Empty
-        | ElementData::Integer(_)
-        | ElementData::Double(_)
-        | ElementData::String(_) => {
+        ElementData::String(s) => {
             serializer
-                .write(xml::writer::XmlEvent::Characters(&elem.data.to_string()))
+                .write(xml::writer::XmlEvent::Characters(s))
                 .map_err(|e| e.to_string())?;
         }
         ElementData::Nested(elements) => {

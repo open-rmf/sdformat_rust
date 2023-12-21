@@ -72,16 +72,13 @@ fn test_plugin() {
         assert_eq!(&*box_elem.name, "box");
         assert_eq!(box_elem.attributes.len(), 1);
         let (attr_name, attr_value) = box_elem.attributes.iter().next().unwrap();
-        assert_eq!(
-            (attr_name, attr_value),
-            (&"name".into(), &ElementData::String("boxy".into()))
-        );
+        assert_eq!((attr_name, attr_value), (&"name".into(), &"boxy".into()));
         match &box_elem.data {
             ElementData::Nested(data) => {
                 assert_eq!(data.all().len(), 1);
                 let size_elem = data.all().iter().next().unwrap();
                 assert_eq!(&*size_elem.name, "size");
-                assert_eq!(size_elem.data, ElementData::Integer(42));
+                assert_eq!(size_elem.data.clone().try_into(), Ok(42));
             }
             _ => panic!("Expected nested element"),
         }
