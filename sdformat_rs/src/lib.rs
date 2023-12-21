@@ -92,8 +92,6 @@ impl ElementMap {
     }
 }
 
-pub struct ElementMapIterator {}
-
 fn parse_data(val: &str) -> ElementData {
     if val.is_empty() {
         ElementData::Empty
@@ -353,6 +351,24 @@ pub use yaserde::de::from_str;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3d(pub Vector3<f64>);
 
+impl TryFrom<String> for Vector3d {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        let sz = s
+            .split_whitespace()
+            .map(|x| x.parse::<f64>())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| "Unable to parse Vector3 into floats".to_string())?;
+
+        if sz.len() != 3 {
+            return Err("Expected 3 items in Vec3 field".to_string());
+        }
+
+        Ok(Vector3d::new(sz[0], sz[1], sz[2]))
+    }
+}
+
 impl Vector3d {
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Vector3d(Vector3::new(x, y, z))
@@ -364,17 +380,7 @@ impl YaDeserialize for Vector3d {
         // deserializer code
         reader.next_event()?;
         if let Ok(xml::reader::XmlEvent::Characters(v)) = reader.peek() {
-            let sz = v
-                .split_whitespace()
-                .map(|x| x.parse::<f64>())
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|_| "Unable to parse Vector3 into floats".to_string())?;
-
-            if sz.len() != 3 {
-                return Err("Expected 3 items in Vec3 field".to_string());
-            }
-
-            Ok(Vector3d(Vector3::new(sz[0], sz[1], sz[2])))
+            v.clone().try_into()
         } else {
             Err("String of elements not found while parsing Vec3".to_string())
         }
@@ -421,6 +427,24 @@ impl YaSerialize for Vector3d {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3i(pub Vector3<i64>);
 
+impl TryFrom<String> for Vector3i {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        let sz = s
+            .split_whitespace()
+            .map(|x| x.parse::<i64>())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| "Unable to parse Vector3 into ints".to_string())?;
+
+        if sz.len() != 3 {
+            return Err("Expected 3 items in Vec3 field".to_string());
+        }
+
+        Ok(Vector3i::new(sz[0], sz[1], sz[2]))
+    }
+}
+
 impl Vector3i {
     pub fn new(x: i64, y: i64, z: i64) -> Self {
         Self(Vector3::new(x, y, z))
@@ -432,17 +456,7 @@ impl YaDeserialize for Vector3i {
         // deserializer code
         reader.next_event()?;
         if let Ok(xml::reader::XmlEvent::Characters(v)) = reader.peek() {
-            let sz = v
-                .split_whitespace()
-                .map(|x| x.parse::<i64>())
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|_| "Unable to parse Vector3 into ints".to_string())?;
-
-            if sz.len() != 3 {
-                return Err("Expected 3 items in Vec3 field".to_string());
-            }
-
-            Ok(Vector3i(Vector3::new(sz[0], sz[1], sz[2])))
+            v.clone().try_into()
         } else {
             Err("String of elements not found while parsing Vec3".to_string())
         }
