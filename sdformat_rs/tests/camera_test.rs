@@ -1,4 +1,3 @@
-use nalgebra::Vector;
 use yaserde::de::from_str;
 
 use sdformat_rs::SdfCamera;
@@ -60,6 +59,39 @@ fn test_geometry_enum() {
     let fr = from_str::<SdfGeometry>(test_syntax);
     assert!(matches!(fr, Ok(_)));
     assert!(matches!(fr.unwrap(), SdfGeometry::Box(_)));
+}
+
+use sdformat_rs::{ElementData, SdfPlugin};
+#[test]
+fn test_plugin() {
+    let test_plugin_content = |fr: &SdfPlugin| {
+        assert_eq!(fr.name, "hello");
+        assert_eq!(fr.filename, "world.so");
+        assert_eq!(fr.elements.all().len(), 1);
+        let box_elem = fr.elements.all().iter().next().unwrap();
+        assert_eq!(&*box_elem.name, "box");
+        assert_eq!(box_elem.attributes.len(), 1);
+        let (attr_name, attr_value) = box_elem.attributes.iter().next().unwrap();
+        assert_eq!((attr_name, attr_value), (&"name".into(), &"boxy".into()));
+        match &box_elem.data {
+            ElementData::Nested(data) => {
+                assert_eq!(data.all().len(), 1);
+                let size_elem = data.all().iter().next().unwrap();
+                assert_eq!(&*size_elem.name, "size");
+                assert_eq!(size_elem.data.clone().try_into(), Ok(42));
+            }
+            _ => panic!("Expected nested element"),
+        }
+    };
+    let test_syntax = "<plugin name=\"hello\" filename=\"world.so\"><box name=\"boxy\"><size>42</size><!-- A comment --></box></plugin>";
+    let fr = from_str::<SdfPlugin>(test_syntax).unwrap();
+    test_plugin_content(&fr);
+    // Serialize back
+    let to = yaserde::ser::to_string(&fr);
+    // Deserialize again and check that it's OK
+    let fr = from_str::<SdfPlugin>(test_syntax).unwrap();
+    test_plugin_content(&fr);
+    assert!(to.is_ok());
 }
 
 use sdformat_rs::SdfLight;

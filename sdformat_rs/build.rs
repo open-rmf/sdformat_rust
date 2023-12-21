@@ -53,7 +53,7 @@ impl RequiredStatus {
     fn from_str(required: &str) -> RequiredStatus {
         if required == "true" || required == "1" {
             return RequiredStatus::One;
-        } else if required == "*" {
+        } else if required == "*" || required == "+" {
             return RequiredStatus::Many;
         }
         RequiredStatus::Optional
@@ -221,7 +221,7 @@ impl SDFElement {
             }
         }
         if !self.properties.rtype.is_empty() {
-            out += "#[yaserde(text)]\n   data: String\n".to_string().as_str(); //format!("data: {}", self.properties.rtype).as_str();
+            out += "  #[yaserde(text)]\n   pub data: String\n";
         }
         out += "}\n\n";
         out += child_gen.as_str();

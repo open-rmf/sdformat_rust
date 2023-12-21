@@ -1,5 +1,7 @@
 extern crate yaserde_derive;
+use std::collections::{BTreeSet, HashMap};
 use std::io::{Read, Write};
+use std::sync::Arc;
 
 use nalgebra::*;
 use yaserde::xml;
@@ -12,10 +14,226 @@ use yaserde_derive::{YaDeserialize, YaSerialize};
 // Most of the structs are generated automatically from the
 include!(concat!(env!("OUT_DIR"), "/sdf.rs"));
 
+#[derive(PartialEq, Clone, Debug)]
+pub enum ElementData {
+    String(String),
+    Nested(ElementMap),
+}
+
+impl Default for ElementData {
+    fn default() -> Self {
+        ElementData::String("".into())
+    }
+}
+
+impl TryFrom<ElementData> for f64 {
+    type Error = String;
+
+    fn try_from(e: ElementData) -> Result<Self, Self::Error> {
+        match e {
+            ElementData::String(s) => s
+                .parse::<f64>()
+                .map_err(|_| "Unable to parse into f64".to_string()),
+            ElementData::Nested(_) => Err("Nested element found".into()),
+        }
+    }
+}
+
+impl TryFrom<ElementData> for i64 {
+    type Error = String;
+
+    fn try_from(e: ElementData) -> Result<Self, Self::Error> {
+        match e {
+            ElementData::String(s) => s
+                .parse::<i64>()
+                .map_err(|_| "Unable to parse into i64".to_string()),
+            ElementData::Nested(_) => Err("Nested element found".into()),
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub struct XmlElement {
+    pub attributes: HashMap<String, String>,
+    pub name: Arc<str>,
+    pub data: ElementData,
+}
+
+impl Default for XmlElement {
+    fn default() -> Self {
+        Self {
+            attributes: Default::default(),
+            name: "".into(),
+            data: Default::default(),
+        }
+    }
+}
+
+#[derive(Default, PartialEq, Clone, Debug)]
+pub struct ElementMap {
+    indexes: HashMap<Arc<str>, BTreeSet<usize>>,
+    elements: Vec<XmlElement>,
+}
+
 // Manually declare plugin
-#[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]
-#[yaserde(rename = "plugin")]
-pub struct SdfPlugin {}
+#[derive(Default, PartialEq, Clone, Debug)]
+pub struct SdfPlugin {
+    pub name: String,
+    pub filename: String,
+    pub elements: ElementMap,
+}
+
+impl ElementMap {
+    pub fn get(&self, name: &str) -> Option<&XmlElement> {
+        self.indexes
+            .get(name)
+            .and_then(|idxs| self.elements.get(*idxs.iter().next()?))
+    }
+
+    pub fn get_all(&self, name: &str) -> Option<Vec<&XmlElement>> {
+        self.indexes
+            .get(name)
+            .and_then(|idxs| idxs.iter().map(|idx| self.elements.get(*idx)).collect())
+    }
+
+    pub fn push(&mut self, elem: XmlElement) {
+        let idx = self.elements.len();
+        let name = elem.name.clone();
+        self.elements.push(elem);
+        self.indexes.entry(name).or_default().insert(idx);
+    }
+
+    pub fn all(&self) -> &[XmlElement] {
+        &self.elements
+    }
+}
+
+fn deserialize_element<R: Read>(
+    reader: &mut yaserde::de::Deserializer<R>,
+) -> Result<XmlElement, String> {
+    let (name, attributes) = match reader.next_event()? {
+        xml::reader::XmlEvent::StartElement {
+            name, attributes, ..
+        } => (name.local_name, attributes),
+        _ => return Err("Unexpected event found when deserializing plugin element".to_string()),
+    };
+    let mut element = XmlElement {
+        name: name.into(),
+        ..Default::default()
+    };
+    for attr in attributes.iter() {
+        element
+            .attributes
+            .insert(attr.name.local_name.clone(), attr.value.to_owned());
+    }
+    match reader.peek()? {
+        xml::reader::XmlEvent::Characters(value) => {
+            element.data = ElementData::String(value.clone());
+            reader.next_event()?;
+            // Discard the next element, it should be an end event
+            reader.next_event()?;
+        }
+        xml::reader::XmlEvent::StartElement { .. } => {
+            let mut elements = ElementMap::default();
+            // TODO(luca) make sure we are ending this element
+            while !matches!(reader.peek(), Ok(xml::reader::XmlEvent::EndElement { .. })) {
+                let elem = deserialize_element(reader)?;
+                elements.push(elem);
+            }
+            element.data = ElementData::Nested(elements);
+            // Discard the next element, it is an end event
+            reader.next_event()?;
+        }
+        xml::reader::XmlEvent::EndElement { .. } => {
+            reader.next_event()?;
+            element.data = ElementData::default();
+        }
+        _ => return Err("Unexpected event found when deserializing plugin data".to_string()),
+    };
+    Ok(element)
+}
+
+impl YaDeserialize for SdfPlugin {
+    fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
+        let mut plugin = SdfPlugin::default();
+        let read_attribute = |attributes: &Vec<OwnedAttribute>, name: &str| {
+            attributes
+                .iter()
+                .find(|attr| attr.name.local_name == name)
+                .map(|attr| attr.value.clone())
+                .unwrap_or_default()
+        };
+        // deserializer code
+        if let Ok(xml::reader::XmlEvent::StartElement { attributes, .. }) = reader.next_event() {
+            plugin.name = read_attribute(&attributes, "name");
+            plugin.filename = read_attribute(&attributes, "filename");
+            while !matches!(reader.peek()?, xml::reader::XmlEvent::EndElement { .. }) {
+                let elem = deserialize_element(reader)?;
+                plugin.elements.push(elem);
+            }
+            Ok(plugin)
+        } else {
+            Err("Element not found when parsing plugin".to_string())
+        }
+    }
+}
+
+fn serialize_element<W: Write>(
+    elem: &XmlElement,
+    serializer: &mut yaserde::ser::Serializer<W>,
+) -> Result<(), String> {
+    let mut builder = xml::writer::XmlEvent::start_element(&*elem.name);
+    for (name, data) in elem.attributes.iter() {
+        builder = builder.attr(xml::name::Name::local(name), data);
+    }
+    serializer.write(builder).map_err(|e| e.to_string())?;
+    match &elem.data {
+        ElementData::String(s) => {
+            serializer
+                .write(xml::writer::XmlEvent::Characters(s))
+                .map_err(|e| e.to_string())?;
+        }
+        ElementData::Nested(elements) => {
+            for element in elements.all().iter() {
+                serialize_element(element, serializer)?;
+            }
+        }
+    }
+    serializer
+        .write(xml::writer::XmlEvent::end_element())
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+impl YaSerialize for SdfPlugin {
+    fn serialize<W: Write>(
+        &self,
+        serializer: &mut yaserde::ser::Serializer<W>,
+    ) -> Result<(), String> {
+        serializer
+            .write(
+                xml::writer::XmlEvent::start_element("plugin")
+                    .attr("name", &self.name)
+                    .attr("filename", &self.filename),
+            )
+            .map_err(|e| e.to_string())?;
+        for element in self.elements.elements.iter() {
+            serialize_element(element, serializer)?;
+        }
+        serializer
+            .write(xml::writer::XmlEvent::end_element())
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    fn serialize_attributes(
+        &self,
+        attributes: Vec<OwnedAttribute>,
+        namespace: Namespace,
+    ) -> Result<(Vec<OwnedAttribute>, Namespace), String> {
+        Ok((attributes, namespace))
+    }
+}
 
 // Frame is another wierdo. For some reason it refuses to serialize/deserialize automatically
 // Hence the manual definition
@@ -129,6 +347,24 @@ pub use yaserde::de::from_str;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3d(pub Vector3<f64>);
 
+impl TryFrom<String> for Vector3d {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        let sz = s
+            .split_whitespace()
+            .map(|x| x.parse::<f64>())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| "Unable to parse Vector3 into floats".to_string())?;
+
+        if sz.len() != 3 {
+            return Err("Expected 3 items in Vec3 field".to_string());
+        }
+
+        Ok(Vector3d::new(sz[0], sz[1], sz[2]))
+    }
+}
+
 impl Vector3d {
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Vector3d(Vector3::new(x, y, z))
@@ -140,17 +376,7 @@ impl YaDeserialize for Vector3d {
         // deserializer code
         reader.next_event()?;
         if let Ok(xml::reader::XmlEvent::Characters(v)) = reader.peek() {
-            let sz = v
-                .split_whitespace()
-                .map(|x| x.parse::<f64>())
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|_| "Unable to parse Vector3 into floats".to_string())?;
-
-            if sz.len() != 3 {
-                return Err("Expected 3 items in Vec3 field".to_string());
-            }
-
-            Ok(Vector3d(Vector3::new(sz[0], sz[1], sz[2])))
+            v.clone().try_into()
         } else {
             Err("String of elements not found while parsing Vec3".to_string())
         }
@@ -197,22 +423,36 @@ impl YaSerialize for Vector3d {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3i(pub Vector3<i64>);
 
+impl TryFrom<String> for Vector3i {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        let sz = s
+            .split_whitespace()
+            .map(|x| x.parse::<i64>())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| "Unable to parse Vector3 into ints".to_string())?;
+
+        if sz.len() != 3 {
+            return Err("Expected 3 items in Vec3 field".to_string());
+        }
+
+        Ok(Vector3i::new(sz[0], sz[1], sz[2]))
+    }
+}
+
+impl Vector3i {
+    pub fn new(x: i64, y: i64, z: i64) -> Self {
+        Self(Vector3::new(x, y, z))
+    }
+}
+
 impl YaDeserialize for Vector3i {
     fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
         // deserializer code
         reader.next_event()?;
         if let Ok(xml::reader::XmlEvent::Characters(v)) = reader.peek() {
-            let sz = v
-                .split_whitespace()
-                .map(|x| x.parse::<i64>())
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|_| "Unable to parse Vector3 into ints".to_string())?;
-
-            if sz.len() != 3 {
-                return Err("Expected 3 items in Vec3 field".to_string());
-            }
-
-            Ok(Vector3i(Vector3::new(sz[0], sz[1], sz[2])))
+            v.clone().try_into()
         } else {
             Err("String of elements not found while parsing Vec3".to_string())
         }
