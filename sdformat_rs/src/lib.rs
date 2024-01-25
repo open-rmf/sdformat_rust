@@ -1,6 +1,8 @@
 extern crate yaserde_derive;
 use std::collections::{BTreeSet, HashMap};
+use std::fmt::Debug;
 use std::io::{Read, Write};
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use nalgebra::*;
@@ -13,6 +15,75 @@ use yaserde_derive::{YaDeserialize, YaSerialize};
 
 // Most of the structs are generated automatically from the
 include!(concat!(env!("OUT_DIR"), "/sdf.rs"));
+
+pub struct Boxed<T> {
+    inner: Box<T>,
+}
+
+impl<T: PartialEq> PartialEq for Boxed<T> {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.inner == rhs.inner
+    }
+}
+
+impl<T: YaDeserialize> YaDeserialize for Boxed<T> {
+    fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
+        Ok(Self {
+            inner: Box::new(T::deserialize(reader)?),
+        })
+    }
+}
+
+impl<T: YaSerialize> YaSerialize for Boxed<T> {
+    fn serialize<W: Write>(&self, writer: &mut yaserde::ser::Serializer<W>) -> Result<(), String> {
+        self.inner.as_ref().serialize(writer)
+    }
+
+    fn serialize_attributes(
+        &self,
+        attributes: Vec<OwnedAttribute>,
+        namespace: Namespace,
+    ) -> Result<(Vec<OwnedAttribute>, Namespace), String> {
+        self.inner
+            .as_ref()
+            .serialize_attributes(attributes, namespace)
+    }
+}
+
+impl<T: Default> Default for Boxed<T> {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+        }
+    }
+}
+
+impl<T: Clone> Clone for Boxed<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<T: Debug> Debug for Boxed<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.inner.as_ref().fmt(f)
+    }
+}
+
+impl<T> Deref for Boxed<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T> DerefMut for Boxed<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum ElementData {

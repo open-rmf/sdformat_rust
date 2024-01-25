@@ -81,6 +81,7 @@ struct SDFAttribute {
     required: RequiredStatus,
     default: Option<String>,
     description: String,
+    reference: Option<String>,
 }
 
 impl SDFAttribute {
@@ -91,6 +92,7 @@ impl SDFAttribute {
             required: RequiredStatus::Optional,
             default: None,
             description: "".to_string(),
+            reference: None,
         }
     }
     fn get_field_string(&self) -> String {
@@ -130,6 +132,7 @@ impl SDFElement {
                 required: RequiredStatus::Optional,
                 default: None,
                 description: "".to_string(),
+                reference: None,
             },
             child_elems: vec![],
             child_attrs: vec![],
@@ -160,25 +163,26 @@ impl SDFElement {
         }
         out += "#[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]\n";
         out += format!("#[yaserde(rename = \"{}\")]\n", self.properties.name).as_str();
-        if self.top_level {
-            out += format!("pub struct {}{} {{\n", prefix_type(prefix), self.typename()).as_str();
-        } else {
-            out += format!(
-                "pub struct {}{} {{\n",
-                prefix_type(prefix),
-                self.properties.name.to_case(Case::Pascal)
-            )
-            .as_str();
-        }
+        out += format!("pub struct {}{} {{\n", prefix_type(prefix), self.typename()).as_str();
         for child in &self.child_attrs {
             out += child.get_field_string().as_str();
         }
 
         let mut child_gen = "".to_string();
-        let name = prefix.to_string().to_case(Case::Pascal) + self.properties.name.as_str();
+        let name = prefix.to_string().to_case(Case::Pascal) + self.typename().as_str();
         for child in &self.child_elems {
             if child.properties.rtype.is_empty() {
                 // TODO(arjo): Handle includes
+                if let Some(reference) = &child.properties.reference {
+                    out += format!(
+                        "  #[yaserde(child, rename = \"{}\")]\n  pub {}: Vec<Boxed<Sdf{}>>,\n",
+                        reference,
+                        reference,
+                        self.typename()
+                    )
+                    .as_str();
+                    continue;
+                }
                 let prefix = prefix_type(&name);
                 child_gen += child.code_gen(prefix.as_str(), file_map).as_str();
                 let typename = prefix + child.properties.name.to_case(Case::Pascal).as_str();
@@ -251,6 +255,9 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
         if let Some(required) = element.attributes.get("required") {
             model.properties.required = RequiredStatus::from_str(required);
         }
+        if let Some(reference) = element.attributes.get("ref") {
+            model.properties.reference = Some(reference.clone());
+        }
     } else if element.name == "attribute" {
         let mut attr = SDFAttribute::new();
         // Parse element description
@@ -282,12 +289,9 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
             if el.name == "attribute" {
                 parse_element(model, el);
             } else if el.name == "element" {
-                if el.attributes.contains_key("ref") {
-                } else {
-                    let mut elem = SDFElement::new();
-                    parse_element(&mut elem, el);
-                    model.child_elems.push(elem);
-                }
+                let mut elem = SDFElement::new();
+                parse_element(&mut elem, el);
+                model.child_elems.push(elem);
             } else if el.name == "include" {
                 let incl = SDFIncludes {
                     filename: el.attributes.get("filename").unwrap().to_string(),
