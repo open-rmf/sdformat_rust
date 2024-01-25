@@ -95,7 +95,7 @@ impl SDFAttribute {
     }
     fn get_field_string(&self) -> String {
         format!(
-            "  #[yaserde(attribute, rename = \"{}\")]\n  pub {}: {},\n",
+            "  #[serde(rename = \"@{}\")]\n  pub {}: {},\n",
             self.name,
             sanitize_field(&self.name),
             self.required
@@ -158,8 +158,8 @@ impl SDFElement {
                 out += "\n";
             }
         }
-        out += "#[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]\n";
-        out += format!("#[yaserde(rename = \"{}\")]\n", self.properties.name).as_str();
+        out += "#[derive(Default, PartialEq, Clone, Debug, Serialize, Deserialize)]\n";
+        out += format!("#[serde(rename = \"{}\")]\n", self.properties.name).as_str();
         if self.top_level {
             out += format!("pub struct {}{} {{\n", prefix_type(prefix), self.typename()).as_str();
         } else {
@@ -183,7 +183,7 @@ impl SDFElement {
                 child_gen += child.code_gen(prefix.as_str(), file_map).as_str();
                 let typename = prefix + child.properties.name.to_case(Case::Pascal).as_str();
                 out += format!(
-                    "  #[yaserde(child, rename = \"{}\")]\n  pub {}: {},\n",
+                    "  #[serde(rename = \"{}\")]\n  pub {}: {},\n",
                     child.properties.name,
                     &sanitize_field(&child.properties.name),
                     child
@@ -195,7 +195,7 @@ impl SDFElement {
             } else {
                 let typename = get_storage_type(child.properties.rtype.as_str());
                 out += format!(
-                    "  #[yaserde(child, rename = \"{}\")]\n  pub {}: {},\n",
+                    "  #[serde(rename = \"{}\")]\n  pub {}: {},\n",
                     child.properties.name,
                     &sanitize_field(&child.properties.name),
                     child.properties.required.wrap_type(typename)
@@ -209,7 +209,7 @@ impl SDFElement {
                     .required
                     .wrap_type(&("Sdf".to_string() + element.typename().as_str()));
                 out += format!(
-                    "  #[yaserde(child, rename = \"{}\")]\n  pub {} : {} /*{:?}*/,\n",
+                    "  #[serde(rename = \"{}\")]\n  pub {} : {} /*{:?}*/,\n",
                     element.properties.name.to_case(Case::Snake),
                     &sanitize_field(&element.properties.name.to_case(Case::Snake)),
                     typename,
@@ -221,7 +221,7 @@ impl SDFElement {
             }
         }
         if !self.properties.rtype.is_empty() {
-            out += "  #[yaserde(text)]\n   pub data: String\n";
+            out += "  #[serde(rename = \"$text\")]\n   pub data: String\n";
         }
         out += "}\n\n";
         out += child_gen.as_str();

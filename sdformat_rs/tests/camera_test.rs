@@ -1,10 +1,9 @@
-use yaserde::de::from_str;
+use quick_xml::de::from_str;
 
 use sdformat_rs::SdfCamera;
 
 #[test]
 fn test_camera_fragment() {
-    use yaserde::de::from_str;
     let test_syntax = r#"<camera>
             <horizontal_fov>1.047</horizontal_fov>
             <image>
@@ -35,30 +34,21 @@ fn test_pose_fragment() {
 }
 
 use nalgebra::Vector3;
-use sdformat_rs::SdfBoxShape;
+use sdformat_rs::SdfGeometry;
 #[test]
 fn test_box_fragment() {
     let test_syntax = "<box><size>0 0 1</size></box>";
-    let fr = from_str::<SdfBoxShape>(test_syntax);
-    assert!(matches!(fr, Ok(_)));
+    let fr = from_str::<SdfGeometry>(test_syntax).unwrap();
 
-    if let Ok(box_shape) = fr {
-        assert!(
-            (box_shape.size.0 - Vector3::<f64>::new(0.0, 0.0, 1.0))
-                .norm()
-                .abs()
-                < 0.000001
-        );
-    }
-}
-
-use sdformat_rs::SdfGeometry;
-#[test]
-fn test_geometry_enum() {
-    let test_syntax = "<geometry><box><size>0 0 1</size></box></geometry>";
-    let fr = from_str::<SdfGeometry>(test_syntax);
-    assert!(matches!(fr, Ok(_)));
-    assert!(matches!(fr.unwrap(), SdfGeometry::Box(_)));
+    let SdfGeometry::Box(box_shape) = fr else {
+        panic!("Didn't find box shape");
+    };
+    assert!(
+        (box_shape.size.0 - Vector3::<f64>::new(0.0, 0.0, 1.0))
+            .norm()
+            .abs()
+            < 0.000001
+    );
 }
 
 use sdformat_rs::{ElementData, SdfPlugin};
@@ -85,9 +75,10 @@ fn test_plugin() {
     };
     let test_syntax = "<plugin name=\"hello\" filename=\"world.so\"><box name=\"boxy\"><size>42</size><!-- A comment --></box></plugin>";
     let fr = from_str::<SdfPlugin>(test_syntax).unwrap();
+    dbg!(&fr);
     test_plugin_content(&fr);
     // Serialize back
-    let to = yaserde::ser::to_string(&fr);
+    let to = quick_xml::se::to_string(&fr);
     // Deserialize again and check that it's OK
     let fr = from_str::<SdfPlugin>(test_syntax).unwrap();
     test_plugin_content(&fr);
@@ -99,6 +90,6 @@ use sdformat_rs::SdfLight;
 fn test_light_direction_pose_serdeser() {
     let test_syntax = "<?xml version=\"1.0\" encoding=\"utf-8\"?><light name=\"test\" type=\"point\"><direction>0 0 1</direction></light>";
     let fr = from_str::<SdfLight>(test_syntax);
-    let serialized = yaserde::ser::to_string(&fr.unwrap()).unwrap();
+    let serialized = quick_xml::se::to_string(&fr.unwrap()).unwrap();
     assert_eq!(test_syntax.to_string(), serialized);
 }

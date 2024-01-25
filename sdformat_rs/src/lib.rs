@@ -1,21 +1,28 @@
-extern crate yaserde_derive;
 use std::collections::{BTreeSet, HashMap};
+use std::fmt;
 use std::io::{Read, Write};
 use std::sync::Arc;
+use std::marker::PhantomData;
 
 use nalgebra::*;
-use yaserde::xml;
-use yaserde::xml::attribute::OwnedAttribute;
-use yaserde::xml::namespace::Namespace;
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
 
-use yaserde::{YaDeserialize, YaSerialize};
-use yaserde_derive::{YaDeserialize, YaSerialize};
+use serde::{Deserialize, Serialize, Serializer, Deserializer};
+use serde::de::{Error, MapAccess, SeqAccess, Visitor};
+use serde::ser::SerializeMap;
 
 // Most of the structs are generated automatically from the
 include!(concat!(env!("OUT_DIR"), "/sdf.rs"));
 
-#[derive(PartialEq, Clone, Debug)]
+/*
+#[derive(Default, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct SdfPlugin {}
+*/
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ElementData {
+    #[serde(rename = "$text")]
     String(String),
     Nested(ElementMap),
 }
@@ -52,10 +59,14 @@ impl TryFrom<ElementData> for i64 {
     }
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "name")]
 pub struct XmlElement {
+    #[serde(flatten)]
     pub attributes: HashMap<String, String>,
-    pub name: Arc<str>,
+    pub name: String,
+    #[serde(flatten)]
+    #[serde(deserialize_with = "deserialize_element_data")]
     pub data: ElementData,
 }
 
@@ -69,19 +80,70 @@ impl Default for XmlElement {
     }
 }
 
-#[derive(Default, PartialEq, Clone, Debug)]
+// Custom deserializer for ValueEnum
+fn deserialize_element_data<'de, D>(deserializer: D) -> Result<ElementData, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct ElementDataVisitor;
+
+    impl<'de> Visitor<'de> for ElementDataVisitor {
+        type Value = ElementData;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a ElementData object")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: Error
+        {
+            Ok(ElementData::String(value.to_string()))
+        }
+
+        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where
+            A: MapAccess<'de>,
+        {
+            if let Ok(nested_element) = map.next_value::<ElementMap>() {
+                return Ok(ElementData::Nested(nested_element));
+            }
+            Err(A::Error::missing_field("nested"))
+        }
+    }
+
+    deserializer.deserialize_any(ElementDataVisitor)
+}
+
+
+#[derive(Default, PartialEq, Clone, Debug, Serialize)]
 pub struct ElementMap {
-    indexes: HashMap<Arc<str>, BTreeSet<usize>>,
+    #[serde(skip)]
+    indexes: HashMap<String, BTreeSet<usize>>,
+    #[serde(flatten)]
     elements: Vec<XmlElement>,
 }
 
 // Manually declare plugin
-#[derive(Default, PartialEq, Clone, Debug)]
+#[derive(Default, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct SdfPlugin {
+    #[serde(rename = "@name")]
     pub name: String,
+    #[serde(rename = "@filename")]
     pub filename: String,
+    #[serde(rename = "$value")]
     pub elements: ElementMap,
 }
+
+/*
+fn deserialize_element_map<'de, D>(deserializer: D) -> Result<ElementMap, D::Error>
+where
+    D: Deserialize<'de>
+{
+    Ok(ElementMap::default())
+}
+*/
+
 
 impl ElementMap {
     pub fn get(&self, name: &str) -> Option<&XmlElement> {
@@ -108,6 +170,7 @@ impl ElementMap {
     }
 }
 
+/*
 fn deserialize_element<R: Read>(
     reader: &mut yaserde::de::Deserializer<R>,
 ) -> Result<XmlElement, String> {
@@ -152,10 +215,148 @@ fn deserialize_element<R: Read>(
     };
     Ok(element)
 }
+*/
 
-impl YaDeserialize for SdfPlugin {
-    fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
-        let mut plugin = SdfPlugin::default();
+/*
+#[derive(Default)]
+struct ElementMapVisitor {}
+
+impl<'de> Visitor<'de> for ElementMapVisitor {
+    type Value = ElementMap;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("A map with string keys and string values")
+    }
+
+    fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
+    where
+        M: MapAccess<'de>,
+    {
+        let mut map = ElementMap::default();
+        while let Some((key, value)) = access.next_entry::<String, String>()? {
+            dbg!(&(key, value));
+            //map.push(key, value);
+        }
+
+        Ok(map)
+    }
+
+}
+*/
+
+impl<'de> Deserialize<'de> for ElementMap {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Default)]
+        struct ElementMapVisitor(ElementMap);
+
+        impl<'de> Visitor<'de> for ElementMapVisitor {
+            type Value = ElementMap;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("A map with string keys and string values")
+            }
+
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                dbg!(v);
+                panic!("THERE");
+                /*
+                let mut map = ElementMap::default();
+                while let Some((key, value)) = access.next_entry::<String, String>()? {
+                    dbg!(&(key, value));
+                    //map.push(key, value);
+                }
+                */
+                //Ok(v)
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                dbg!(v);
+                panic!("HELLO");
+                /*
+                let mut map = ElementMap::default();
+                while let Some((key, value)) = access.next_entry::<String, String>()? {
+                    dbg!(&(key, value));
+                    //map.push(key, value);
+                }
+                */
+            }
+
+            fn visit_map<M>(mut self, mut access: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                if let Ok(string_entry) = access.next_entry::<String, String>() {
+                    dbg!("Found attribute");
+                } else if let Ok(map_entry) = access.next_entry::<String, HashMap<String, String>>() {
+                    dbg!("Found map");
+                    dbg!(&map_entry);
+                } else {
+                    dbg!("Unhandled type!");
+                }
+                /*
+                while let Some((key, value)) = access.next_entry::<String, String>()? {
+                    dbg!(&(key, value));
+                    //map.push(key, value);
+                }
+                */
+                Ok(self.0)
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>
+            {
+
+                Ok(self.0)
+            }
+
+            //fn visit_struct<
+
+        }
+
+        // Do manual parsing with quick-xml
+        dbg!("Deserializing");
+        //let s = String::deserialize(deserializer)?;
+        let s = deserializer.deserialize_seq(ElementMapVisitor::default())?;
+        dbg!("Done");
+        Ok(s)
+        /*
+        dbg!(&s);
+        let mut reader = Reader::from_str(&s);
+        let mut buf = Vec::new();
+        loop {
+        // NOTE: this is the generic case when we don't know about the input BufRead.
+        // when the input is a &str or a &[u8], we don't actually need to use another
+        // buffer, we could directly call `reader.read_event()`
+            match reader.read_event_into(&mut buf) {
+                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
+                // exits the loop when reaching end of file
+                Ok(Event::Eof) => break,
+                Ok(Event::Start(e)) => {
+                    match e.name().as_ref() {
+                        b"tag1" => println!("attributes values: {:?}",
+                                            e.attributes().map(|a| a.unwrap().value)
+                                            .collect::<Vec<_>>()),
+                        _ => (),
+                    }
+                }
+                Ok(Event::Text(e)) => println!("Text {}", e.unescape().unwrap()),
+                //Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
+
+                // There are several other `Event`s we do not consider here
+                _ => (),
+            }
+        }
+        Ok(Self::default())
+        */
+        //deserializer.deserialize_map(ElementMapVisitor::default())
+        /*
         let read_attribute = |attributes: &Vec<OwnedAttribute>, name: &str| {
             attributes
                 .iter()
@@ -163,6 +364,7 @@ impl YaDeserialize for SdfPlugin {
                 .map(|attr| attr.value.clone())
                 .unwrap_or_default()
         };
+        
         // deserializer code
         if let Ok(xml::reader::XmlEvent::StartElement { attributes, .. }) = reader.next_event() {
             plugin.name = read_attribute(&attributes, "name");
@@ -175,23 +377,23 @@ impl YaDeserialize for SdfPlugin {
         } else {
             Err("Element not found when parsing plugin".to_string())
         }
+        */
     }
 }
 
-fn serialize_element<W: Write>(
+/*
+fn serialize_element<S: SerializeMap>(
     elem: &XmlElement,
-    serializer: &mut yaserde::ser::Serializer<W>,
-) -> Result<(), String> {
-    let mut builder = xml::writer::XmlEvent::start_element(&*elem.name);
+    serializer: &mut S,
+) -> Result<(), S::Error> {
+    // Rename each attribute to prepend a @
     for (name, data) in elem.attributes.iter() {
-        builder = builder.attr(xml::name::Name::local(name), data);
+        let name = String::from("@") + name;
+        serializer.serialize_entry(&name, data)?;
     }
-    serializer.write(builder).map_err(|e| e.to_string())?;
     match &elem.data {
         ElementData::String(s) => {
-            serializer
-                .write(xml::writer::XmlEvent::Characters(s))
-                .map_err(|e| e.to_string())?;
+            serializer.serialize_entry("$value", s)?;
         }
         ElementData::Nested(elements) => {
             for element in elements.all().iter() {
@@ -199,76 +401,61 @@ fn serialize_element<W: Write>(
             }
         }
     }
-    serializer
-        .write(xml::writer::XmlEvent::end_element())
-        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
-impl YaSerialize for SdfPlugin {
-    fn serialize<W: Write>(
-        &self,
-        serializer: &mut yaserde::ser::Serializer<W>,
-    ) -> Result<(), String> {
-        serializer
-            .write(
-                xml::writer::XmlEvent::start_element("plugin")
-                    .attr("name", &self.name)
-                    .attr("filename", &self.filename),
-            )
-            .map_err(|e| e.to_string())?;
-        for element in self.elements.elements.iter() {
-            serialize_element(element, serializer)?;
+impl Serialize for ElementMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer
+    {
+        let mut state = serializer.serialize_map(None)?;
+        /*
+        state.serialize_entry("@name", &self.name);
+        state.serialize_entry("@filename", &self.filename);
+        */
+        for element in self.elements.iter() {
+            serialize_element(element, &mut state)?;
         }
-        serializer
-            .write(xml::writer::XmlEvent::end_element())
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
-    fn serialize_attributes(
-        &self,
-        attributes: Vec<OwnedAttribute>,
-        namespace: Namespace,
-    ) -> Result<(Vec<OwnedAttribute>, Namespace), String> {
-        Ok((attributes, namespace))
+        state.end()
     }
 }
+*/
 
 // Frame is another wierdo. For some reason it refuses to serialize/deserialize automatically
 // Hence the manual definition
 // Todo(arjo): Actually implement Frame.
-#[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]
-#[yaserde(rename = "frame")]
+#[derive(Default, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[serde(rename = "frame")]
 pub struct SdfFrame {}
 
 // Geometry should really be an enum rather than a list of Options, redefine it here
 /// The shape of the visual or collision object.
-#[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]
-#[yaserde(rename = "geometry")]
+#[derive(Default, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[serde(rename = "geometry")]
 pub enum SdfGeometry {
-    #[yaserde(child, rename = "empty")]
+    #[serde(rename = "empty")]
     #[default]
     Empty,
-    #[yaserde(child, rename = "box")]
+    #[serde(rename = "box")]
     r#Box(SdfBoxShape),
-    #[yaserde(child, rename = "capsule")]
+    #[serde(rename = "capsule")]
     Capsule(SdfCapsuleShape),
-    #[yaserde(child, rename = "cylinder")]
+    #[serde(rename = "cylinder")]
     Cylinder(SdfCylinderShape),
-    #[yaserde(child, rename = "ellipsoid")]
+    #[serde(rename = "ellipsoid")]
     Ellipsoid(SdfEllipsoidShape),
-    #[yaserde(child, rename = "heightmap")]
+    #[serde(rename = "heightmap")]
     Heightmap(SdfHeightmapShape),
-    #[yaserde(child, rename = "image")]
+    #[serde(rename = "image")]
     Image(SdfImageShape),
-    #[yaserde(child, rename = "mesh")]
+    #[serde(rename = "mesh")]
     Mesh(SdfMeshShape),
-    #[yaserde(child, rename = "plane")]
+    #[serde(rename = "plane")]
     Plane(SdfPlaneShape),
-    #[yaserde(child, rename = "polyline")]
+    #[serde(rename = "polyline")]
     Polyline(SdfPolylineShape),
-    #[yaserde(child, rename = "sphere")]
+    #[serde(rename = "sphere")]
     Sphere(SdfSphereShape),
 }
 
@@ -342,8 +529,6 @@ impl SdfPose {
     }
 }
 
-pub use yaserde::de::from_str;
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vector3d(pub Vector3<f64>);
 
@@ -371,52 +556,19 @@ impl Vector3d {
     }
 }
 
-impl YaDeserialize for Vector3d {
-    fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
-        // deserializer code
-        reader.next_event()?;
-        if let Ok(xml::reader::XmlEvent::Characters(v)) = reader.peek() {
-            v.clone().try_into()
-        } else {
-            Err("String of elements not found while parsing Vec3".to_string())
-        }
+impl<'de> Deserialize<'de> for Vector3d {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let val = String::deserialize(deserializer)?;
+        val.try_into().map_err(|e| D::Error::custom(e))
     }
 }
 
-impl YaSerialize for Vector3d {
-    fn serialize<W: Write>(
-        &self,
-        serializer: &mut yaserde::ser::Serializer<W>,
-    ) -> Result<(), String> {
-        // serializer code
-        let Some(yaserde_label) = serializer.get_start_event_name() else {
-            return Err("vector3d is a primitive".to_string());
-        };
-        let struct_start_event =
-            yaserde::xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
-
-        serializer
-            .write(struct_start_event)
-            .map_err(|e| e.to_string())?;
-        serializer
-            .write(xml::writer::XmlEvent::Characters(&format!(
-                "{} {} {}",
-                self.0.x, self.0.y, self.0.z
-            )))
-            .map_err(|e| e.to_string())?;
-        serializer
-            .write(yaserde::xml::writer::XmlEvent::end_element())
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
-    fn serialize_attributes(
-        &self,
-        attributes: Vec<OwnedAttribute>,
-        namespace: Namespace,
-    ) -> Result<(Vec<OwnedAttribute>, Namespace), String> {
-        println!("{:?}", namespace);
-        Ok((attributes, namespace))
+impl Serialize for Vector3d {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer
+    {
+        serializer.serialize_str(&format!("{} {} {}", self.0.x, self.0.y, self.0.z))
     }
 }
 
@@ -447,50 +599,18 @@ impl Vector3i {
     }
 }
 
-impl YaDeserialize for Vector3i {
-    fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
-        // deserializer code
-        reader.next_event()?;
-        if let Ok(xml::reader::XmlEvent::Characters(v)) = reader.peek() {
-            v.clone().try_into()
-        } else {
-            Err("String of elements not found while parsing Vec3".to_string())
-        }
+impl<'de> Deserialize<'de> for Vector3i {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let val = String::deserialize(deserializer)?;
+        val.try_into().map_err(|e| D::Error::custom(e))
     }
 }
 
-impl YaSerialize for Vector3i {
-    fn serialize<W: Write>(
-        &self,
-        serializer: &mut yaserde::ser::Serializer<W>,
-    ) -> Result<(), String> {
-        // serializer code
-        let Some(yaserde_label) = serializer.get_start_event_name() else {
-            return Err("vector3d is a primitive".to_string());
-        };
-        let struct_start_event =
-            yaserde::xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
-
-        serializer
-            .write(struct_start_event)
-            .map_err(|e| e.to_string())?;
-        serializer
-            .write(xml::writer::XmlEvent::Characters(&format!(
-                "{} {} {}",
-                self.0.x, self.0.y, self.0.z
-            )))
-            .map_err(|e| e.to_string())?;
-        serializer
-            .write(yaserde::xml::writer::XmlEvent::end_element())
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
-    fn serialize_attributes(
-        &self,
-        attributes: Vec<OwnedAttribute>,
-        namespace: Namespace,
-    ) -> Result<(Vec<OwnedAttribute>, Namespace), String> {
-        Ok((attributes, namespace))
+impl Serialize for Vector3i {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer
+    {
+        serializer.serialize_str(&format!("{} {} {}", self.0.x, self.0.y, self.0.z))
     }
 }
