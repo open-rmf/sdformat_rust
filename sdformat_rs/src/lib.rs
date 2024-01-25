@@ -20,6 +20,14 @@ pub struct Boxed<T> {
     inner: Box<T>,
 }
 
+impl<T> From<T> for Boxed<T> {
+    fn from(t: T) -> Self {
+        Self {
+            inner: Box::new(t),
+        }
+    }
+}
+
 impl<T: PartialEq> PartialEq for Boxed<T> {
     fn eq(&self, rhs: &Self) -> bool {
         self.inner == rhs.inner
