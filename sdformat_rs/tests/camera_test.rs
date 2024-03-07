@@ -92,6 +92,17 @@ fn test_plugin() {
     let fr = from_str::<SdfPlugin>(test_syntax).unwrap();
     test_plugin_content(&fr);
     assert!(to.is_ok());
+
+    // Test accessing and mutating API
+    let test_syntax = "<plugin name=\"hello\" filename=\"world.so\"><size>42</size></plugin>";
+    let mut plugin = from_str::<SdfPlugin>(test_syntax).unwrap();
+    let size = plugin.elements.get("size").unwrap();
+    assert_eq!(size.data, ElementData::String("42".to_string()));
+    let size = plugin.elements.get_mut("size").unwrap();
+    size.data = ElementData::String("hello".to_string());
+
+    let size = plugin.elements.get("size").unwrap();
+    assert_eq!(size.data, ElementData::String("hello".to_string()));
 }
 
 use sdformat_rs::SdfLight;
