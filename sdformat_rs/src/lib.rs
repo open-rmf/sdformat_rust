@@ -169,6 +169,12 @@ impl ElementMap {
             .and_then(|idxs| self.elements.get(*idxs.iter().next()?))
     }
 
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut XmlElement> {
+        self.indexes
+            .get(name)
+            .and_then(|idxs| self.elements.get_mut(*idxs.iter().next()?))
+    }
+
     pub fn get_all(&self, name: &str) -> Option<Vec<&XmlElement>> {
         self.indexes
             .get(name)
