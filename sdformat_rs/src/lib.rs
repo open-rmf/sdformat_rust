@@ -22,9 +22,7 @@ pub struct Boxed<T> {
 
 impl<T> From<T> for Boxed<T> {
     fn from(t: T) -> Self {
-        Self {
-            inner: Box::new(t),
-        }
+        Self { inner: Box::new(t) }
     }
 }
 
@@ -163,24 +161,43 @@ pub struct SdfPlugin {
 }
 
 impl ElementMap {
+    /// Returns a reference to the first element with the specified name
     pub fn get(&self, name: &str) -> Option<&XmlElement> {
         self.indexes
             .get(name)
             .and_then(|idxs| self.elements.get(*idxs.iter().next()?))
     }
 
+    /// Returns a mutable reference to the first element with the specified name
     pub fn get_mut(&mut self, name: &str) -> Option<&mut XmlElement> {
         self.indexes
             .get(name)
             .and_then(|idxs| self.elements.get_mut(*idxs.iter().next()?))
     }
 
-    pub fn get_all(&self, name: &str) -> Option<Vec<&XmlElement>> {
+    /// Returns Some(iter) over all the elements with the requested name, None if no elements
+    /// exist.
+    pub fn get_all(&self, name: &str) -> Option<impl Iterator<Item = &XmlElement>> {
         self.indexes
             .get(name)
-            .and_then(|idxs| idxs.iter().map(|idx| self.elements.get(*idx)).collect())
+            .map(|idxs| idxs.iter().filter_map(|idx| self.elements.get(*idx)))
     }
 
+    /// Returns Some(iter) over all the elements with the requested name, None if no elements
+    /// exist. This method returns a mutable reference.
+    pub fn get_all_mut(&mut self, name: &str) -> Option<impl Iterator<Item = &mut XmlElement>> {
+        let idxs = self.indexes.get(name)?;
+        Some(idxs.iter().filter_map(|idx| {
+            self.elements.get_mut(*idx).map(|e| {
+                // SAFETY: Since indexes is a BTreeSet it will not provide multiple references
+                // to the same element. get_mut() makes sure we are pointing to an existing
+                // element.
+                unsafe { &mut *(e as *mut XmlElement) }
+            })
+        }))
+    }
+
+    /// Adds a new element.
     pub fn push(&mut self, elem: XmlElement) {
         let idx = self.elements.len();
         let name = elem.name.clone();
@@ -188,6 +205,7 @@ impl ElementMap {
         self.indexes.entry(name).or_default().insert(idx);
     }
 
+    /// Returns a slice containing all the elements in this map.
     pub fn all(&self) -> &[XmlElement] {
         &self.elements
     }

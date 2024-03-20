@@ -103,6 +103,32 @@ fn test_plugin() {
 
     let size = plugin.elements.get("size").unwrap();
     assert_eq!(size.data, ElementData::String("hello".to_string()));
+    // test get_all
+    let test_syntax = "<plugin name=\"hello\" filename=\"world.so\"><box name=\"box1\"></box><box name=\"box2\"></box></plugin>";
+    let mut plugin = from_str::<SdfPlugin>(test_syntax).unwrap();
+    {
+        let mut boxes = plugin.elements.get_all("box").unwrap();
+        let box1 = boxes.next().unwrap();
+        assert_eq!(
+            box1.attributes.values().next(),
+            Some("box1".to_string()).as_ref()
+        );
+        let box2 = boxes.next().unwrap();
+        assert_eq!(
+            box2.attributes.values().next(),
+            Some("box2".to_string()).as_ref()
+        );
+    }
+    {
+        {
+            let mut boxes = plugin.elements.get_all_mut("box").unwrap();
+            let box1 = boxes.next().unwrap();
+            box1.attributes
+                .insert("hello".to_string(), "world".to_string());
+        }
+        let box1 = plugin.elements.get("box").unwrap();
+        assert_eq!(box1.attributes.get("hello"), Some(&"world".to_string()));
+    }
 }
 
 use sdformat_rs::SdfLight;
