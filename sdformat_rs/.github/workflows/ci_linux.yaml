@@ -1,0 +1,26 @@
+name: ci_linux
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build sdformat_rs
+      run: |
+        cd rmf_site_format
+        cargo build
+    - name: Test sdformat_rs
+      run: cargo test
+    - name: Style sdformat_rs
+      run: cargo fmt --check
