@@ -175,26 +175,29 @@ impl ElementMap {
             .and_then(|idxs| self.elements.get_mut(*idxs.iter().next()?))
     }
 
-    /// Returns Some(iter) over all the elements with the requested name, None if no elements
-    /// exist.
-    pub fn get_all(&self, name: &str) -> Option<impl Iterator<Item = &XmlElement>> {
-        self.indexes
-            .get(name)
-            .map(|idxs| idxs.iter().filter_map(|idx| self.elements.get(*idx)))
+    /// Runs the provided closure for each element with the requested name.
+    pub fn for_each<F: Fn(&XmlElement)>(&mut self, name: &str, f: F) {
+        let Some(idxs) = self.indexes.get(name) else {
+            return;
+        };
+        for idx in idxs.iter() {
+            if let Some(element) = self.elements.get(*idx) {
+                f(element);
+            }
+        }
     }
 
-    /// Returns Some(iter) over all the elements with the requested name, None if no elements
-    /// exist. This method returns a mutable reference.
-    pub fn get_all_mut(&mut self, name: &str) -> Option<impl Iterator<Item = &mut XmlElement>> {
-        let idxs = self.indexes.get(name)?;
-        Some(idxs.iter().filter_map(|idx| {
-            self.elements.get_mut(*idx).map(|e| {
-                // SAFETY: Since indexes is a BTreeSet it will not provide multiple references
-                // to the same element. get_mut() makes sure we are pointing to an existing
-                // element.
-                unsafe { &mut *(e as *mut XmlElement) }
-            })
-        }))
+    /// Runs the provided closure for each element with the requested name. Allows mutating the
+    /// element.
+    pub fn for_each_mut<F: FnMut(&mut XmlElement)>(&mut self, name: &str, mut f: F) {
+        let Some(idxs) = self.indexes.get(name) else {
+            return;
+        };
+        for idx in idxs.iter() {
+            if let Some(ref mut element) = self.elements.get_mut(*idx) {
+                f(element);
+            }
+        }
     }
 
     /// Adds a new element.
