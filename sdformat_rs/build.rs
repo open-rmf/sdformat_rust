@@ -309,7 +309,7 @@ fn parse_element(model: &mut SDFElement, element: &Element) {
 
 fn read_all_specs() -> Result<HashMap<String, SDFElement>, String> {
     let mut res = HashMap::new();
-    for dir_entry in std::fs::read_dir("sdformat_spec/1.10").unwrap().flatten() {
+    for dir_entry in std::fs::read_dir("sdformat_spec/1.11").unwrap().flatten() {
         if !dir_entry.metadata().unwrap().is_file() {
             continue;
         }
