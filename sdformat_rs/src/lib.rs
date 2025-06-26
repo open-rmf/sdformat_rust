@@ -1,4 +1,3 @@
-extern crate yaserde_derive;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use std::io::{Read, Write};
@@ -6,12 +5,10 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use nalgebra::*;
-use yaserde::xml;
-use yaserde::xml::attribute::OwnedAttribute;
-use yaserde::xml::namespace::Namespace;
+use xml::attribute::OwnedAttribute;
+use xml::namespace::Namespace;
 
 use yaserde::{YaDeserialize, YaSerialize};
-use yaserde_derive::{YaDeserialize, YaSerialize};
 
 // Most of the structs are generated automatically from the
 include!(concat!(env!("OUT_DIR"), "/sdf.rs"));
@@ -353,28 +350,28 @@ pub struct SdfFrame {}
 #[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]
 #[yaserde(rename = "geometry")]
 pub enum SdfGeometry {
-    #[yaserde(child, rename = "empty")]
+    #[yaserde(rename = "empty")]
     #[default]
     Empty,
-    #[yaserde(child, rename = "box")]
+    #[yaserde(rename = "box")]
     r#Box(SdfBoxShape),
-    #[yaserde(child, rename = "capsule")]
+    #[yaserde(rename = "capsule")]
     Capsule(SdfCapsuleShape),
-    #[yaserde(child, rename = "cylinder")]
+    #[yaserde(rename = "cylinder")]
     Cylinder(SdfCylinderShape),
-    #[yaserde(child, rename = "ellipsoid")]
+    #[yaserde(rename = "ellipsoid")]
     Ellipsoid(SdfEllipsoidShape),
-    #[yaserde(child, rename = "heightmap")]
+    #[yaserde(rename = "heightmap")]
     Heightmap(SdfHeightmapShape),
-    #[yaserde(child, rename = "image")]
+    #[yaserde(rename = "image")]
     Image(SdfImageShape),
-    #[yaserde(child, rename = "mesh")]
+    #[yaserde(rename = "mesh")]
     Mesh(SdfMeshShape),
-    #[yaserde(child, rename = "plane")]
+    #[yaserde(rename = "plane")]
     Plane(SdfPlaneShape),
-    #[yaserde(child, rename = "polyline")]
+    #[yaserde(rename = "polyline")]
     Polyline(SdfPolylineShape),
-    #[yaserde(child, rename = "sphere")]
+    #[yaserde(rename = "sphere")]
     Sphere(SdfSphereShape),
 }
 
@@ -499,7 +496,7 @@ impl YaSerialize for Vector3d {
             return Err("vector3d is a primitive".to_string());
         };
         let struct_start_event =
-            yaserde::xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
+            xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
 
         serializer
             .write(struct_start_event)
@@ -511,7 +508,7 @@ impl YaSerialize for Vector3d {
             )))
             .map_err(|e| e.to_string())?;
         serializer
-            .write(yaserde::xml::writer::XmlEvent::end_element())
+            .write(xml::writer::XmlEvent::end_element())
             .map_err(|e| e.to_string())?;
         Ok(())
     }
@@ -575,7 +572,7 @@ impl YaSerialize for Vector3i {
             return Err("vector3d is a primitive".to_string());
         };
         let struct_start_event =
-            yaserde::xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
+            xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
 
         serializer
             .write(struct_start_event)
@@ -587,7 +584,7 @@ impl YaSerialize for Vector3i {
             )))
             .map_err(|e| e.to_string())?;
         serializer
-            .write(yaserde::xml::writer::XmlEvent::end_element())
+            .write(xml::writer::XmlEvent::end_element())
             .map_err(|e| e.to_string())?;
         Ok(())
     }
