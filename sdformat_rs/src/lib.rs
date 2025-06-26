@@ -152,6 +152,9 @@ pub struct ElementMap {
     elements: Vec<XmlElement>,
 }
 
+#[derive(Default, PartialEq, Clone, Debug)]
+pub struct SdfParams(pub ElementMap);
+
 // Manually declare plugin
 #[derive(Default, PartialEq, Clone, Debug)]
 pub struct SdfPlugin {
@@ -284,6 +287,22 @@ impl YaDeserialize for SdfPlugin {
     }
 }
 
+impl YaDeserialize for SdfParams {
+    fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
+        let mut params = SdfParams::default();
+        // deserializer code
+        if let Ok(xml::reader::XmlEvent::StartElement { .. }) = reader.next_event() {
+            while !matches!(reader.peek()?, xml::reader::XmlEvent::EndElement { .. }) {
+                let elem = deserialize_element(reader)?;
+                params.0.push(elem);
+            }
+            Ok(params)
+        } else {
+            Err("Element not found when parsing plugin".to_string())
+        }
+    }
+}
+
 fn serialize_element<W: Write>(
     elem: &XmlElement,
     serializer: &mut yaserde::ser::Serializer<W>,
@@ -324,6 +343,32 @@ impl YaSerialize for SdfPlugin {
             )
             .map_err(|e| e.to_string())?;
         for element in self.elements.elements.iter() {
+            serialize_element(element, serializer)?;
+        }
+        serializer
+            .write(xml::writer::XmlEvent::end_element())
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    fn serialize_attributes(
+        &self,
+        attributes: Vec<OwnedAttribute>,
+        namespace: Namespace,
+    ) -> Result<(Vec<OwnedAttribute>, Namespace), String> {
+        Ok((attributes, namespace))
+    }
+}
+
+impl YaSerialize for SdfParams {
+    fn serialize<W: Write>(
+        &self,
+        serializer: &mut yaserde::ser::Serializer<W>,
+    ) -> Result<(), String> {
+        serializer
+            .write(xml::writer::XmlEvent::start_element("experimental:params"))
+            .map_err(|e| e.to_string())?;
+        for element in self.0.elements.iter() {
             serialize_element(element, serializer)?;
         }
         serializer

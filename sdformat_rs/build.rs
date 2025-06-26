@@ -63,11 +63,14 @@ impl RequiredStatus {
 fn sanitize_field(fieldname: &str) -> String {
     let hashset = HashSet::from(["loop", "static", "type", "box"]);
 
-    if hashset.contains(fieldname) {
+    let fieldname = if hashset.contains(fieldname) {
         format!("r#{}", fieldname)
     } else {
         fieldname.to_string()
-    }
+    };
+
+    // Replace semicolon for experimental params
+    fieldname.replace(":", "_")
 }
 
 struct SDFIncludes {
