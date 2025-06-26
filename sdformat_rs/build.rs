@@ -100,7 +100,7 @@ impl SDFAttribute {
     }
     fn get_field_string(&self) -> String {
         format!(
-            "  #[yaserde(attribute, rename = \"{}\")]\n  pub {}: {},\n",
+            "  #[yaserde(attribute = true, rename = \"{}\")]\n  pub {}: {},\n",
             self.name,
             sanitize_field(&self.name),
             self.required
@@ -178,7 +178,7 @@ impl SDFElement {
                 // TODO(arjo): Handle includes
                 if let Some(reference) = &child.properties.reference {
                     out += format!(
-                        "  #[yaserde(child, rename = \"{}\")]\n  pub {}: Vec<Boxed<Sdf{}>>,\n",
+                        "  #[yaserde(rename = \"{}\")]\n  pub {}: Vec<Boxed<Sdf{}>>,\n",
                         reference,
                         reference,
                         self.typename()
@@ -190,7 +190,7 @@ impl SDFElement {
                 child_gen += child.code_gen(prefix.as_str(), file_map).as_str();
                 let typename = prefix + child.properties.name.to_case(Case::Pascal).as_str();
                 out += format!(
-                    "  #[yaserde(child, rename = \"{}\")]\n  pub {}: {},\n",
+                    "  #[yaserde(rename = \"{}\")]\n  pub {}: {},\n",
                     child.properties.name,
                     &sanitize_field(&child.properties.name),
                     child
@@ -202,7 +202,7 @@ impl SDFElement {
             } else {
                 let typename = get_storage_type(child.properties.rtype.as_str());
                 out += format!(
-                    "  #[yaserde(child, rename = \"{}\")]\n  pub {}: {},\n",
+                    "  #[yaserde(rename = \"{}\")]\n  pub {}: {},\n",
                     child.properties.name,
                     &sanitize_field(&child.properties.name),
                     child.properties.required.wrap_type(typename)
@@ -216,7 +216,7 @@ impl SDFElement {
                     .required
                     .wrap_type(&("Sdf".to_string() + element.typename().as_str()));
                 out += format!(
-                    "  #[yaserde(child, rename = \"{}\")]\n  pub {} : {} /*{:?}*/,\n",
+                    "  #[yaserde(rename = \"{}\")]\n  pub {} : {} /*{:?}*/,\n",
                     element.properties.name.to_case(Case::Snake),
                     &sanitize_field(&element.properties.name.to_case(Case::Snake)),
                     typename,
@@ -228,7 +228,7 @@ impl SDFElement {
             }
         }
         if !self.properties.rtype.is_empty() {
-            out += "  #[yaserde(text)]\n   pub data: String\n";
+            out += "  #[yaserde(text = true)]\n   pub data: String\n";
         }
         out += "}\n\n";
         out += child_gen.as_str();
@@ -339,7 +339,7 @@ fn main() {
 
     let mut contents = String::new();
     for (file, model) in &hashmap {
-        if file == "plugin.sdf" || file == "frame.sdf" || file == "geometry.sdf" {
+        if file == "plugin.sdf" || file == "frame.sdf" || file == "geometry.sdf" || file == "params.sdf" {
             //Skip
             continue;
         }
