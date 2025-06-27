@@ -8,6 +8,8 @@ use nalgebra::*;
 use xml::attribute::OwnedAttribute;
 use xml::namespace::Namespace;
 
+pub use yaserde;
+
 use yaserde::{YaDeserialize, YaSerialize};
 
 // Most of the structs are generated automatically from the
