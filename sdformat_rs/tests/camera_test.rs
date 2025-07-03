@@ -121,7 +121,7 @@ fn test_plugin() {
 use sdformat_rs::SdfLight;
 #[test]
 fn test_light_direction_pose_serdeser() {
-    let test_syntax = "<?xml version=\"1.0\" encoding=\"utf-8\"?><light name=\"test\" type=\"point\"><direction>0 0 1</direction></light>";
+    let test_syntax = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><light name=\"test\" type=\"point\"><direction>0 0 1</direction></light>";
     let fr = from_str::<SdfLight>(test_syntax);
     let serialized = yaserde::ser::to_string(&fr.unwrap()).unwrap();
     assert_eq!(test_syntax.to_string(), serialized);
@@ -130,7 +130,7 @@ fn test_light_direction_pose_serdeser() {
 use sdformat_rs::SdfModel;
 #[test]
 fn test_nested_model() {
-    let test_syntax = "<?xml version=\"1.0\" encoding=\"utf-8\"?><model name=\"top\"><model name=\"nested\" /></model>";
+    let test_syntax = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><model name=\"top\"><model name=\"nested\" /></model>";
     let fr = from_str::<SdfModel>(test_syntax);
     let serialized = yaserde::ser::to_string(&fr.unwrap()).unwrap();
     assert_eq!(test_syntax.to_string(), serialized);

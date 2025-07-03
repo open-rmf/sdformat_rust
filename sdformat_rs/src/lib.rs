@@ -1,4 +1,3 @@
-extern crate yaserde_derive;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use std::io::{Read, Write};
@@ -6,12 +5,12 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use nalgebra::*;
-use yaserde::xml;
-use yaserde::xml::attribute::OwnedAttribute;
-use yaserde::xml::namespace::Namespace;
+use xml::attribute::OwnedAttribute;
+use xml::namespace::Namespace;
+
+pub use yaserde;
 
 use yaserde::{YaDeserialize, YaSerialize};
-use yaserde_derive::{YaDeserialize, YaSerialize};
 
 // Most of the structs are generated automatically from the
 include!(concat!(env!("OUT_DIR"), "/sdf.rs"));
@@ -152,6 +151,9 @@ pub struct ElementMap {
     elements: Vec<XmlElement>,
 }
 
+#[derive(Default, PartialEq, Clone, Debug)]
+pub struct SdfParams(pub ElementMap);
+
 // Manually declare plugin
 #[derive(Default, PartialEq, Clone, Debug)]
 pub struct SdfPlugin {
@@ -284,6 +286,22 @@ impl YaDeserialize for SdfPlugin {
     }
 }
 
+impl YaDeserialize for SdfParams {
+    fn deserialize<R: Read>(reader: &mut yaserde::de::Deserializer<R>) -> Result<Self, String> {
+        let mut params = SdfParams::default();
+        // deserializer code
+        if let Ok(xml::reader::XmlEvent::StartElement { .. }) = reader.next_event() {
+            while !matches!(reader.peek()?, xml::reader::XmlEvent::EndElement { .. }) {
+                let elem = deserialize_element(reader)?;
+                params.0.push(elem);
+            }
+            Ok(params)
+        } else {
+            Err("Element not found when parsing plugin".to_string())
+        }
+    }
+}
+
 fn serialize_element<W: Write>(
     elem: &XmlElement,
     serializer: &mut yaserde::ser::Serializer<W>,
@@ -341,6 +359,32 @@ impl YaSerialize for SdfPlugin {
     }
 }
 
+impl YaSerialize for SdfParams {
+    fn serialize<W: Write>(
+        &self,
+        serializer: &mut yaserde::ser::Serializer<W>,
+    ) -> Result<(), String> {
+        serializer
+            .write(xml::writer::XmlEvent::start_element("experimental:params"))
+            .map_err(|e| e.to_string())?;
+        for element in self.0.elements.iter() {
+            serialize_element(element, serializer)?;
+        }
+        serializer
+            .write(xml::writer::XmlEvent::end_element())
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    fn serialize_attributes(
+        &self,
+        attributes: Vec<OwnedAttribute>,
+        namespace: Namespace,
+    ) -> Result<(Vec<OwnedAttribute>, Namespace), String> {
+        Ok((attributes, namespace))
+    }
+}
+
 // Frame is another wierdo. For some reason it refuses to serialize/deserialize automatically
 // Hence the manual definition
 // Todo(arjo): Actually implement Frame.
@@ -353,28 +397,28 @@ pub struct SdfFrame {}
 #[derive(Default, PartialEq, Clone, Debug, YaSerialize, YaDeserialize)]
 #[yaserde(rename = "geometry")]
 pub enum SdfGeometry {
-    #[yaserde(child, rename = "empty")]
+    #[yaserde(rename = "empty")]
     #[default]
     Empty,
-    #[yaserde(child, rename = "box")]
+    #[yaserde(rename = "box")]
     r#Box(SdfBoxShape),
-    #[yaserde(child, rename = "capsule")]
+    #[yaserde(rename = "capsule")]
     Capsule(SdfCapsuleShape),
-    #[yaserde(child, rename = "cylinder")]
+    #[yaserde(rename = "cylinder")]
     Cylinder(SdfCylinderShape),
-    #[yaserde(child, rename = "ellipsoid")]
+    #[yaserde(rename = "ellipsoid")]
     Ellipsoid(SdfEllipsoidShape),
-    #[yaserde(child, rename = "heightmap")]
+    #[yaserde(rename = "heightmap")]
     Heightmap(SdfHeightmapShape),
-    #[yaserde(child, rename = "image")]
+    #[yaserde(rename = "image")]
     Image(SdfImageShape),
-    #[yaserde(child, rename = "mesh")]
+    #[yaserde(rename = "mesh")]
     Mesh(SdfMeshShape),
-    #[yaserde(child, rename = "plane")]
+    #[yaserde(rename = "plane")]
     Plane(SdfPlaneShape),
-    #[yaserde(child, rename = "polyline")]
+    #[yaserde(rename = "polyline")]
     Polyline(SdfPolylineShape),
-    #[yaserde(child, rename = "sphere")]
+    #[yaserde(rename = "sphere")]
     Sphere(SdfSphereShape),
 }
 
@@ -498,8 +542,7 @@ impl YaSerialize for Vector3d {
         let Some(yaserde_label) = serializer.get_start_event_name() else {
             return Err("vector3d is a primitive".to_string());
         };
-        let struct_start_event =
-            yaserde::xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
+        let struct_start_event = xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
 
         serializer
             .write(struct_start_event)
@@ -511,7 +554,7 @@ impl YaSerialize for Vector3d {
             )))
             .map_err(|e| e.to_string())?;
         serializer
-            .write(yaserde::xml::writer::XmlEvent::end_element())
+            .write(xml::writer::XmlEvent::end_element())
             .map_err(|e| e.to_string())?;
         Ok(())
     }
@@ -574,8 +617,7 @@ impl YaSerialize for Vector3i {
         let Some(yaserde_label) = serializer.get_start_event_name() else {
             return Err("vector3d is a primitive".to_string());
         };
-        let struct_start_event =
-            yaserde::xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
+        let struct_start_event = xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
 
         serializer
             .write(struct_start_event)
@@ -587,7 +629,7 @@ impl YaSerialize for Vector3i {
             )))
             .map_err(|e| e.to_string())?;
         serializer
-            .write(yaserde::xml::writer::XmlEvent::end_element())
+            .write(xml::writer::XmlEvent::end_element())
             .map_err(|e| e.to_string())?;
         Ok(())
     }

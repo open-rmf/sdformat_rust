@@ -56,14 +56,14 @@
         The link's moment of inertia about Co (the link's center of mass) for Ĉx.
       </description>
     </element>
-    <element name="ixy" type="double" default="0.0" required="1">
+    <element name="ixy" type="double" default="0.0" required="0">
       <description>
         The link's product of inertia about Co (the link's center of mass) for
         Ĉx and Ĉy, where the product of inertia convention -m x y  (not +m x y)
         is used. If Ĉx or Ĉy is a principal inertia direction, ixy = 0.
       </description>
     </element>
-    <element name="ixz" type="double" default="0.0" required="1">
+    <element name="ixz" type="double" default="0.0" required="0">
       <description>
         The link's product of inertia about Co (the link's center of mass) for
         Ĉx and Ĉz, where the product of inertia convention -m x z  (not +m x z)
@@ -75,7 +75,7 @@
         The link's moment of inertia about Co (the link's center of mass) for Ĉy.
       </description>
     </element>
-    <element name="iyz" type="double" default="0.0" required="1">
+    <element name="iyz" type="double" default="0.0" required="0">
       <description>
         The link's product of inertia about Co (the link's center of mass) for
         Ĉy and Ĉz, where the product of inertia convention -m y z  (not +m y z)

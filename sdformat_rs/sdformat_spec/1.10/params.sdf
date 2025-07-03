@@ -1,0 +1,8 @@
+<!-- Experimental params-->
+<element name="experimental:params" required="*">
+  <description>Parameters allow overriding child elements of an included model</description>
+  <element copy_data="true" required="*">
+    <description>This is a special element that should not be specified in an SDFormat file. It automatically copies child elements into the SDFormat element so that a plugin can access the data.</description>
+  </element>
+</element> <!-- End Plugin -->
+
