@@ -339,7 +339,11 @@ fn main() {
 
     let mut contents = String::new();
     for (file, model) in &hashmap {
-        if file == "plugin.sdf" || file == "frame.sdf" || file == "geometry.sdf" || file == "params.sdf" {
+        if file == "plugin.sdf"
+            || file == "frame.sdf"
+            || file == "geometry.sdf"
+            || file == "params.sdf"
+        {
             //Skip
             continue;
         }

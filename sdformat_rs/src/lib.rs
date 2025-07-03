@@ -542,8 +542,7 @@ impl YaSerialize for Vector3d {
         let Some(yaserde_label) = serializer.get_start_event_name() else {
             return Err("vector3d is a primitive".to_string());
         };
-        let struct_start_event =
-            xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
+        let struct_start_event = xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
 
         serializer
             .write(struct_start_event)
@@ -618,8 +617,7 @@ impl YaSerialize for Vector3i {
         let Some(yaserde_label) = serializer.get_start_event_name() else {
             return Err("vector3d is a primitive".to_string());
         };
-        let struct_start_event =
-            xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
+        let struct_start_event = xml::writer::XmlEvent::start_element(yaserde_label.as_ref());
 
         serializer
             .write(struct_start_event)
