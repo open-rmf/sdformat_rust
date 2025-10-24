@@ -1,6 +1,6 @@
 use yaserde::de::from_str;
 
-use sdformat_rs::SdfCamera;
+use sdformat::SdfCamera;
 
 #[test]
 fn test_camera_fragment() {
@@ -20,7 +20,7 @@ fn test_camera_fragment() {
     assert!(matches!(fr, Ok(_)));
 }
 
-use sdformat_rs::SdfPose;
+use sdformat::SdfPose;
 #[test]
 fn test_pose_fragment() {
     let test_syntax = "<pose>1 0 0 0 0 0</pose>";
@@ -35,7 +35,7 @@ fn test_pose_fragment() {
 }
 
 use nalgebra::Vector3;
-use sdformat_rs::SdfBoxShape;
+use sdformat::SdfBoxShape;
 #[test]
 fn test_box_fragment() {
     let test_syntax = "<box><size>0 0 1</size></box>";
@@ -52,7 +52,7 @@ fn test_box_fragment() {
     }
 }
 
-use sdformat_rs::SdfGeometry;
+use sdformat::SdfGeometry;
 #[test]
 fn test_geometry_enum() {
     let test_syntax = "<geometry><box><size>0 0 1</size></box></geometry>";
@@ -61,7 +61,7 @@ fn test_geometry_enum() {
     assert!(matches!(fr.unwrap(), SdfGeometry::Box(_)));
 }
 
-use sdformat_rs::{ElementData, SdfPlugin};
+use sdformat::{ElementData, SdfPlugin};
 #[test]
 fn test_plugin() {
     let test_plugin_content = |fr: &SdfPlugin| {
@@ -118,7 +118,7 @@ fn test_plugin() {
     });
 }
 
-use sdformat_rs::SdfLight;
+use sdformat::SdfLight;
 #[test]
 fn test_light_direction_pose_serdeser() {
     let test_syntax = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><light name=\"test\" type=\"point\"><direction>0 0 1</direction></light>";
@@ -127,7 +127,7 @@ fn test_light_direction_pose_serdeser() {
     assert_eq!(test_syntax.to_string(), serialized);
 }
 
-use sdformat_rs::SdfModel;
+use sdformat::SdfModel;
 #[test]
 fn test_nested_model() {
     let test_syntax = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><model name=\"top\"><model name=\"nested\" /></model>";

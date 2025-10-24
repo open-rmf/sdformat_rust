@@ -1,7 +1,18 @@
 [package]
-name = "sdformat_rs"
+name = "sdformat"
 version = "0.1.0"
 edition = "2021"
+authors = ["Arjo Chakravarty <arjoc@intrinsic.ai>"]
+license = "Apache-2.0"
+readme = "README.md"
+description = "Parsing library for sdformat in Rust"
+repository = "https://github.com/open-rmf/sdformat_rust"
+keywords = ["sdformat", "gazebo"]
+categories = ["simulation", "parser-implementations", ]
+
+exclude = [
+    ".github/*"
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

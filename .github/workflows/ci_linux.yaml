@@ -26,10 +26,10 @@ jobs:
     - uses: actions/checkout@v3
     - name: Style
       run: |
-        cd sdformat_rs && cargo fmt --check
+        cd sdformat && cargo fmt --check
     - name: Build workspace
       run: |
-        cd sdformat_rs && cargo build
+        cd sdformat && cargo build
     - name: Run tests
       run: |
-        cd sdformat_rs && cargo test
+        cd sdformat && cargo test
